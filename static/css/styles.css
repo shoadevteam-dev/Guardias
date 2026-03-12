@@ -1,0 +1,73 @@
+/* Estilos principales del Sistema de Guardias */
+
+:root {
+    --primary-color: #4472C4;
+    --sidebar-bg: #343a40;
+    --weekend-bg: #f0f0f0;
+    --hover-bg: #f8f9fa;
+}
+
+/* Sidebar */
+.sidebar {
+    min-height: 100vh;
+    background-color: var(--sidebar-bg);
+    color: white;
+}
+
+.sidebar .nav-link {
+    color: rgba(255, 255, 255, 0.8);
+    transition: color 0.2s;
+}
+
+.sidebar .nav-link:hover {
+    color: white;
+}
+
+/* Calendario */
+.calendar-header {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.calendar-day {
+    min-height: 100px;
+    border: 1px solid #dee2e6;
+    transition: background-color 0.2s;
+}
+
+.calendar-day:hover {
+    background-color: var(--hover-bg);
+    cursor: pointer;
+}
+
+.calendar-day.weekend {
+    background-color: var(--weekend-bg);
+}
+
+/* Badges */
+.guardia-badge {
+    font-size: 0.85rem;
+}
+
+.suplencia-badge {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.reten-badge {
+    background-color: #dc3545;
+    color: white;
+}
+
+.acumulado-badge {
+    font-size: 0.9rem;
+}
+
+/* Utilidades */
+.h-100 {
+    height: 100%;
+}
+
+.fw-bold {
+    font-weight: bold;
+}

@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Guardias</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/styles.css') }}" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Sidebar -->
+            <nav class="col-md-2 d-none d-md-block sidebar p-3">
+                <h4 class="text-white mb-4"><i class="bi bi-shield-check"></i> Guardias</h4>
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#modalPersonas">
+                            <i class="bi bi-people"></i> Personas
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#modalNovedades">
+                            <i class="bi bi-exclamation-triangle"></i> Novedades
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" data-bs-toggle="modal" data-bs-target="#modalAcumulados">
+                            <i class="bi bi-graph-up"></i> Acumulados
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+
+            <!-- Main content -->
+            <main class="col-md-10 ms-sm-auto px-4 py-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2><i class="bi bi-calendar3"></i> Calendario de Guardias</h2>
+                    <div class="d-flex gap-2">
+                        <select class="form-select" id="selectMes" style="width: 150px;">
+                            <option value="1">Enero</option>
+                            <option value="2">Febrero</option>
+                            <option value="3">Marzo</option>
+                            <option value="4">Abril</option>
+                            <option value="5">Mayo</option>
+                            <option value="6">Junio</option>
+                            <option value="7">Julio</option>
+                            <option value="8">Agosto</option>
+                            <option value="9">Septiembre</option>
+                            <option value="10">Octubre</option>
+                            <option value="11">Noviembre</option>
+                            <option value="12">Diciembre</option>
+                        </select>
+                        <select class="form-select" id="selectAnio" style="width: 100px;">
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                            <option value="2027">2027</option>
+                            <option value="2028">2028</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="CalendarioModule.generarGuardias()">
+                            <i class="bi bi-play-fill"></i> Generar
+                        </button>
+                        <button class="btn btn-info text-white" onclick="ImportarModule.abrirModal()">
+                            <i class="bi bi-calendar-range"></i> Importar
+                        </button>
+                        <button class="btn btn-success" onclick="CalendarioModule.exportarExcel()">
+                            <i class="bi bi-file-earmark-excel"></i> Excel
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Calendario -->
+                <div class="card">
+                    <div class="card-header calendar-header">
+                        <div class="row text-center fw-bold">
+                            <div class="col">Día</div>
+                            <div class="col">Fecha</div>
+                            <div class="col">Persona Asignada</div>
+                            <div class="col">Tipo</div>
+                            <div class="col">Acciones</div>
+                        </div>
+                    </div>
+                    <div id="calendarBody"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal Personas -->
+    <div class="modal fade" id="modalPersonas" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-people"></i> Gestión de Personas</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group mb-3">
+                        <input type="text" class="form-control" id="nuevaPersona" placeholder="Nombre de la persona">
+                        <button class="btn btn-primary" onclick="PersonasModule.agregar()">
+                            <i class="bi bi-plus-lg"></i> Agregar
+                        </button>
+                    </div>
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Estado</th>
+                                <th>Acumulado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaPersonas"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Novedades -->
+    <div class="modal fade" id="modalNovedades" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Gestión de Novedades</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formNovedad">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Persona</label>
+                                <select class="form-select" id="novedadPersona"></select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Tipo</label>
+                                <select class="form-select" id="novedadTipo">
+                                    <option value="vacaciones">Vacaciones</option>
+                                    <option value="baja">Baja médica</option>
+                                    <option value="no_disponible">No disponible</option>
+                                    <option value="otro">Otro</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Descripción</label>
+                                <input type="text" class="form-control" id="novedadDescripcion">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Fecha Inicio</label>
+                                <input type="date" class="form-control" id="novedadFechaInicio" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Fecha Fin</label>
+                                <input type="date" class="form-control" id="novedadFechaFin" required>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <button type="button" class="btn btn-primary w-100" onclick="NovedadesModule.agregar()">
+                                    <i class="bi bi-plus-lg"></i> Agregar
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                    <hr>
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Persona</th>
+                                <th>Tipo</th>
+                                <th>Desde</th>
+                                <th>Hasta</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaNovedades"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Acumulados -->
+    <div class="modal fade" id="modalAcumulados" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-graph-up"></i> Acumulados Actuales</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Persona</th>
+                                <th>Acumulado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaAcumulados"></tbody>
+                    </table>
+                    <small class="text-muted">
+                        * Positivo: debe guardias | Negativo: tiene guardias de más
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Importar -->
+    <div class="modal fade" id="modalHistorico" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-calendar-range"></i> Importar Guardias Manualmente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Asigna personas a cada día del mes seleccionado</p>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Mes:</label>
+                            <select class="form-select" id="importarMes" onchange="ImportarModule.cargarTabla(parseInt(this.value), parseInt(document.getElementById('importarAnio').value))">
+                                <option value="1">Enero</option>
+                                <option value="2">Febrero</option>
+                                <option value="3">Marzo</option>
+                                <option value="4">Abril</option>
+                                <option value="5">Mayo</option>
+                                <option value="6">Junio</option>
+                                <option value="7">Julio</option>
+                                <option value="8">Agosto</option>
+                                <option value="9">Septiembre</option>
+                                <option value="10">Octubre</option>
+                                <option value="11">Noviembre</option>
+                                <option value="12">Diciembre</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Año:</label>
+                            <select class="form-select" id="importarAnio" onchange="ImportarModule.cargarTabla(parseInt(document.getElementById('importarMes').value), parseInt(this.value))">
+                                <option value="2025">2025</option>
+                                <option value="2026">2026</option>
+                                <option value="2027">2027</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <i class="bi bi-calendar3"></i> Asignar por día
+                        </div>
+                        <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-bordered">
+                                <thead>
+                                    <tr>
+                                        <th width="80">Día</th>
+                                        <th>Fecha</th>
+                                        <th>Persona</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tablaImportar"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        Selecciona una persona para cada día. Los días sin seleccionar no se asignarán.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="ImportarModule.guardar()">
+                        <i class="bi bi-save"></i> Guardar Asignaciones
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Reasignar -->
+    <div class="modal fade" id="modalReasignar" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Reasignar Guardia</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Fecha: <strong id="reasignarFecha"></strong></p>
+                    <p>Actual: <strong id="reasignarActual"></strong></p>
+                    <label class="form-label">Nueva persona (manual):</label>
+                    <select class="form-select" id="reasignarPersona"></select>
+                    <hr>
+                    <div class="text-center">
+                        <p class="mb-2 text-muted">¿Prefieres asignación aleatoria?</p>
+                        <button type="button" class="btn btn-warning" onclick="ReasignarModule.random()">
+                            <i class="bi bi-shuffle"></i> Reasignar Random
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="ReasignarModule.confirmar()">
+                        <i class="bi bi-check-lg"></i> Reasignar Manual
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Módulos de la aplicación -->
+    <script src="{{ url_for('static', filename='js/acumulados.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/personas.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/novedades.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/importar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/reasignar.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/calendario.js') }}"></script>
+
+    <!-- Inicialización -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            CalendarioModule.init();
+            PersonasModule.cargar();
+            NovedadesModule.cargar();
+            AcumuladosModule.cargar();
+        });
+    </script>
+</body>
+</html>

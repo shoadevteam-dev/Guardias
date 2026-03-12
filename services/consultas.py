@@ -1,0 +1,87 @@
+"""
+Servicios de consulta - Operaciones de lectura
+"""
+from datetime import datetime, timedelta
+from models.models import Guardia, Novedad, Persona
+
+
+def obtener_personas_disponibles(fecha, exclude_id=None):
+    """Obtiene personas disponibles para una fecha específica"""
+    personas = Persona.query.filter_by(activo=True).all()
+    disponibles = []
+
+    for p in personas:
+        if exclude_id and p.id == exclude_id:
+            continue
+
+        tiene_novedad = Novedad.query.filter(
+            Novedad.persona_id == p.id,
+            Novedad.fecha_inicio <= fecha,
+            Novedad.fecha_fin >= fecha
+        ).first()
+
+        if tiene_novedad:
+            continue
+
+        disponibles.append(p)
+
+    return disponibles
+
+
+def contar_guardias_mes(persona_id, mes, anio):
+    """Cuenta las guardias de una persona en un mes específico"""
+    inicio_mes = datetime(anio, mes, 1)
+    if mes == 12:
+        fin_mes = datetime(anio + 1, 1, 1) - timedelta(days=1)
+    else:
+        fin_mes = datetime(anio, mes + 1, 1) - timedelta(days=1)
+
+    return Guardia.query.filter(
+        Guardia.persona_id == persona_id,
+        Guardia.fecha >= inicio_mes.date(),
+        Guardia.fecha <= fin_mes.date()
+    ).count()
+
+
+def tiene_guardia_anterior(persona_id, fecha):
+    """Verifica si la persona tuvo guardia el día anterior"""
+    dia_anterior = fecha - timedelta(days=1)
+    guardia = Guardia.query.filter_by(
+        persona_id=persona_id,
+        fecha=dia_anterior
+    ).first()
+    return guardia is not None
+
+
+def obtener_rango_mes(mes, anio):
+    """Obtiene fecha inicio y fin de un mes"""
+    inicio_mes = datetime(anio, mes, 1)
+    if mes == 12:
+        fin_mes = datetime(anio + 1, 1, 1) - timedelta(days=1)
+    else:
+        fin_mes = datetime(anio, mes + 1, 1) - timedelta(days=1)
+    return inicio_mes, fin_mes
+
+
+def obtener_guardias_mes(mes, anio):
+    """Obtiene todas las guardias de un mes ordenadas por fecha"""
+    inicio_mes, fin_mes = obtener_rango_mes(mes, anio)
+    return Guardia.query.filter(
+        Guardia.fecha >= inicio_mes.date(),
+        Guardia.fecha <= fin_mes.date()
+    ).order_by(Guardia.fecha).all()
+
+
+def obtener_persona_por_id(persona_id):
+    """Obtiene una persona por su ID"""
+    return Persona.query.get(persona_id)
+
+
+def obtener_todas_las_personas():
+    """Obtiene todas las personas"""
+    return Persona.query.all()
+
+
+def obtener_personas_activas():
+    """Obtiene solo las personas activas"""
+    return Persona.query.filter_by(activo=True).all()
