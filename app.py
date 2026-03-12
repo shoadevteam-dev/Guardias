@@ -4,6 +4,7 @@ Aplicación Flask modular para administración de turnos de guardia
 
 Estructura:
 ├── app.py                 - Punto de entrada principal
+├── config.py              - Configuración de la aplicación
 ├── models/                - Modelos de base de datos
 ├── services/              - Lógica de negocio
 ├── routes/                - Rutas API
@@ -11,56 +12,51 @@ Estructura:
 └── templates/             - Plantillas HTML
 """
 
-from flask import Flask, render_template
-from models import db, Persona
-from routes import personas_bp, guardias_bp, novedades_bp, export_bp
+from flask import Flask
+from config import config
+from models import db
+from routes import (
+    personas_bp,
+    guardias_bp,
+    novedades_bp,
+    export_bp,
+    main_bp
+)
+from services import init_database
 
 
-def create_app():
-    """Factory de aplicación"""
+def create_app(config_name: str = 'default') -> Flask:
+    """
+    Factory de aplicación
+    
+    Args:
+        config_name: Nombre de la configuración a usar
+        
+    Returns:
+        Aplicación Flask configurada
+    """
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///guardias.db'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = 'guardias-secret-key-2026'
+    app.config.from_object(config[config_name])
 
     # Inicializar extensiones
     db.init_app(app)
 
     # Registrar blueprints
-    app.register_blueprint(personas_bp)
-    app.register_blueprint(guardias_bp)
-    app.register_blueprint(novedades_bp)
-    app.register_blueprint(export_bp)
-
-    # Rutas principales
-    @app.route('/')
-    def index():
-        """Página principal"""
-        personas = Persona.query.filter_by(activo=True).all()
-        return render_template('index.html', personas=personas)
+    _register_blueprints(app)
 
     # Inicializar base de datos
-    with app.app_context():
-        db.create_all()
-        if Persona.query.count() == 0:
-            _init_default_personas()
+    init_database(app)
 
     return app
 
 
-def _init_default_personas():
-    """Inicializa personas por defecto"""
-    personas_default = [
-        'P.ramirez', 'A.Fortunato', 'E.Campillay', 'I.Rivas',
-        'V.Rojas', 'G.San Martin', 'L.Henriquez', 'M.Havliczek',
-        'L.Zamorano', 'M.Rojas', 'A.Terraza', 'A.Rios'
-    ]
-
-    for nombre in personas_default:
-        db.session.add(Persona(nombre=nombre))
-
-    db.session.commit()
-    print("Base de datos inicializada con personas por defecto")
+def _register_blueprints(app: Flask) -> None:
+    """Registra todos los blueprints de la aplicación"""
+    app.register_blueprint(main_bp)
+    app.register_blueprint(personas_bp)
+    app.register_blueprint(guardias_bp)
+    app.register_blueprint(novedades_bp)
+    app.register_blueprint(export_bp)
 
 
 if __name__ == '__main__':

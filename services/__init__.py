@@ -20,6 +20,7 @@ from .guardias_service import (
     importar_guardias_desde_lista
 )
 from .excel_service import exportar_guardias_excel
+from .init_data import init_database, PERSONAS_DEFAULT
 
 __all__ = [
     # Consultas
@@ -39,5 +40,8 @@ __all__ = [
     'asignar_guardia_manual',
     'importar_guardias_desde_lista',
     # Excel
-    'exportar_guardias_excel'
+    'exportar_guardias_excel',
+    # Inicialización
+    'init_database',
+    'PERSONAS_DEFAULT'
 ]
