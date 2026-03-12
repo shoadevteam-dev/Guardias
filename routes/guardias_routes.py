@@ -111,3 +111,23 @@ def asignar_manual():
         return jsonify({'message': mensaje})
     else:
         return jsonify({'error': mensaje}), 400
+
+
+@guardias_bp.route('/<mes>/<anio>/eliminar', methods=['POST'])
+def eliminar_calendario(mes, anio):
+    """Elimina todas las guardias de un mes específico"""
+    from models.models import Guardia, db
+    from services.consultas import obtener_rango_mes
+
+    inicio_mes, fin_mes = obtener_rango_mes(int(mes), int(anio))
+
+    guardias_eliminadas = Guardia.query.filter(
+        Guardia.fecha >= inicio_mes.date(),
+        Guardia.fecha <= fin_mes.date()
+    ).delete()
+
+    db.session.commit()
+
+    return jsonify({
+        'message': f'Se eliminaron {guardias_eliminadas} guardias del calendario'
+    })

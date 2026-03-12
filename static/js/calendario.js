@@ -5,6 +5,7 @@
 
 const CalendarioModule = (function() {
     let fechaReasignar = null;
+    let guardiasActuales = 0;
 
     /**
      * Inicializa el calendario
@@ -13,7 +14,35 @@ const CalendarioModule = (function() {
         const hoy = new Date();
         document.getElementById('selectMes').value = hoy.getMonth() + 1;
         document.getElementById('selectAnio').value = hoy.getFullYear();
+        
+        // Agregar listeners a los selectores
+        document.getElementById('selectMes').addEventListener('change', function() {
+            setTimeout(cargarCalendario, 100);
+        });
+        document.getElementById('selectAnio').addEventListener('change', function() {
+            setTimeout(cargarCalendario, 100);
+        });
+        
         cargarCalendario();
+    }
+
+    /**
+     * Actualiza el indicador de estado y los botones
+     */
+    function actualizarEstado(guardiasCount) {
+        const estadoEl = document.getElementById('estadoCalendario');
+        const btnGuardar = document.getElementById('btnGuardar');
+        const btnEliminar = document.getElementById('btnEliminar');
+        
+        if (guardiasCount === 0) {
+            estadoEl.innerHTML = '<span class="badge bg-secondary"><i class="bi bi-calendar-x"></i> Calendario vacío</span>';
+            if (btnGuardar) btnGuardar.disabled = true;
+            if (btnEliminar) btnEliminar.disabled = true;
+        } else {
+            estadoEl.innerHTML = `<span class="badge bg-success"><i class="bi bi-calendar-check"></i> ${guardiasCount} guardias asignadas</span>`;
+            if (btnGuardar) btnGuardar.disabled = false;
+            if (btnEliminar) btnEliminar.disabled = false;
+        }
     }
 
     /**
@@ -35,12 +64,15 @@ const CalendarioModule = (function() {
             }
             const guardias = await res.json();
             console.log(`Guardias recibidas: ${guardias.length}`);
-            console.log('Primera guardia:', guardias[0]);
+            
+            guardiasActuales = guardias.length;
+            
+            // Actualizar indicador de estado y botones
+            actualizarEstado(guardias.length);
 
             const guardiasDict = {};
             guardias.forEach(g => {
                 guardiasDict[g.fecha] = g;
-                console.log(`  Key guardiasDict: "${g.fecha}" => ${g.persona_nombre}`);
             });
 
             const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
@@ -143,10 +175,72 @@ const CalendarioModule = (function() {
         window.location.href = `/api/exportar/${mes}/${anio}`;
     }
 
+    /**
+     * Elimina todas las guardias de un mes
+     */
+    async function eliminarCalendario() {
+        const mes = parseInt(document.getElementById('selectMes').value);
+        const anio = parseInt(document.getElementById('selectAnio').value);
+
+        const result = await Swal.fire({
+            title: '¿Eliminar calendario completo?',
+            text: `Se eliminarán TODAS las guardias de ${mes}/${anio}. Esta acción no se puede deshacer.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, eliminar todo',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#dc3545'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const response = await fetch(`/api/guardias/${mes}/${anio}/eliminar`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    await cargarCalendario();
+                    Swal.fire('Eliminado', data.message, 'success');
+                } else {
+                    Swal.fire('Error', data.error || 'Error al eliminar', 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                Swal.fire('Error', 'No se pudo conectar con el servidor', 'error');
+            }
+        }
+    }
+
+    /**
+     * Guarda el calendario del mes (exporta a Excel)
+     */
+    async function guardarCalendario() {
+        const mes = parseInt(document.getElementById('selectMes').value);
+        const anio = parseInt(document.getElementById('selectAnio').value);
+
+        const result = await Swal.fire({
+            title: '¿Guardar calendario?',
+            text: `Se descargará el calendario de ${mes}/${anio} en formato Excel`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, guardar',
+            cancelButtonText: 'Cancelar'
+        });
+
+        if (result.isConfirmed) {
+            exportarExcel();
+            Swal.fire('Guardado', 'El calendario se ha descargado correctamente', 'success');
+        }
+    }
+
     return {
         init,
         cargarCalendario,
         generarGuardias,
-        exportarExcel
+        exportarExcel,
+        eliminarCalendario,
+        guardarCalendario
     };
 })();

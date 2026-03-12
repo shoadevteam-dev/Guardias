@@ -25,6 +25,11 @@ const PersonasModule = (function() {
                     </span>
                 </td>
                 <td>
+                    <button class="btn btn-sm ${p.activo ? 'btn-warning' : 'btn-success'}" 
+                            onclick="PersonasModule.toggleActivo(${p.id})" 
+                            title="${p.activo ? 'Desactivar' : 'Activar'}">
+                        <i class="bi bi-${p.activo ? 'pause' : 'play'}-circle"></i>
+                    </button>
                     <button class="btn btn-sm btn-danger" onclick="PersonasModule.eliminar(${p.id})">
                         <i class="bi bi-trash"></i>
                     </button>
@@ -62,6 +67,27 @@ const PersonasModule = (function() {
     }
 
     /**
+     * Cambia el estado activo/inactivo de una persona
+     */
+    async function toggleActivo(id) {
+        const result = await Swal.fire({
+            title: '¿Cambiar estado?',
+            text: 'Esto cambiará el estado de la persona. Las personas inactivas no se incluyen en la generación de guardias.',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, cambiar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#0d6efd'
+        });
+
+        if (result.isConfirmed) {
+            await fetch(`/api/personas/${id}/toggle-activo`, { method: 'POST' });
+            await cargar();
+            Swal.fire('Estado actualizado', '', 'success');
+        }
+    }
+
+    /**
      * Elimina una persona permanentemente
      */
     async function eliminar(id) {
@@ -85,6 +111,7 @@ const PersonasModule = (function() {
     return {
         cargar,
         agregar,
+        toggleActivo,
         eliminar
     };
 })();

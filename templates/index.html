@@ -37,7 +37,7 @@
             <main class="col-md-10 ms-sm-auto px-4 py-4">
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h2><i class="bi bi-calendar3"></i> Calendario de Guardias</h2>
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 align-items-center">
                         <select class="form-select" id="selectMes" style="width: 150px;">
                             <option value="1">Enero</option>
                             <option value="2">Febrero</option>
@@ -58,14 +58,20 @@
                             <option value="2027">2027</option>
                             <option value="2028">2028</option>
                         </select>
+                        <span id="estadoCalendario" class="ms-2"></span>
+                    </div>
+                    <div class="d-flex gap-2">
                         <button class="btn btn-primary" onclick="CalendarioModule.generarGuardias()">
                             <i class="bi bi-play-fill"></i> Generar
+                        </button>
+                        <button class="btn btn-success" id="btnGuardar" onclick="CalendarioModule.guardarCalendario()">
+                            <i class="bi bi-save"></i> Guardar
                         </button>
                         <button class="btn btn-info text-white" onclick="ImportarModule.abrirModal()">
                             <i class="bi bi-calendar-range"></i> Importar
                         </button>
-                        <button class="btn btn-success" onclick="CalendarioModule.exportarExcel()">
-                            <i class="bi bi-file-earmark-excel"></i> Excel
+                        <button class="btn btn-danger" id="btnEliminar" onclick="CalendarioModule.eliminarCalendario()">
+                            <i class="bi bi-trash"></i> Eliminar
                         </button>
                     </div>
                 </div>

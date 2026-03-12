@@ -60,17 +60,15 @@ def update_persona(id):
     })
 
 
-@personas_bp.route('/<int:id>', methods=['DELETE'])
-def delete_persona(id):
-    """Elimina permanentemente una persona y sus registros"""
+@personas_bp.route('/<int:id>/toggle-activo', methods=['POST'])
+def toggle_activo(id):
+    """Cambia el estado activo/inactivo de una persona"""
     persona = Persona.query.get_or_404(id)
-
-    Guardia.query.filter_by(persona_id=id).delete()
-    Guardia.query.filter_by(persona_original_id=id).delete()
-    Novedad.query.filter_by(persona_id=id).delete()
-    HistoricoAcumulado.query.filter_by(persona_id=id).delete()
-
-    db.session.delete(persona)
+    persona.activo = not persona.activo
     db.session.commit()
 
-    return jsonify({'message': 'Persona eliminada permanentemente'})
+    return jsonify({
+        'id': persona.id,
+        'nombre': persona.nombre,
+        'activo': persona.activo
+    })
