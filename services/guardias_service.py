@@ -604,7 +604,41 @@ def reasignar_guardia_random(fecha_str):
     if not disponibles:
         return False, "No hay personas disponibles", None, None
 
-    persona_nueva = random.choice(disponibles)
+    # Seleccionar aleatoriamente entre los candidatos que tienen menos guardias en el mes
+    # y que respetan las restricciones SIPAT (día por medio / consecutivos).
+    # Esto evita que la reasignación elija a alguien con demasiadas guardias.
+    mes = fecha.month
+    anio = fecha.year
+    scores = []
+    for p in disponibles:
+        guardias_mes = contar_guardias_mes(p.id, mes, anio)
+
+        # Base: menos guardias en el mes es mejor
+        score = guardias_mes * 100
+
+        # Penalizaciones por restricciones SIPAT y consecutivos
+        if tiene_guardia_anterior(p.id, fecha):
+            score += 100
+        if p.grado and 'SIPAT' in p.grado.upper():
+            if tiene_guardia_dia_medio(p.id, fecha):
+                score += 20
+            # Evitar consecutivos para SIPAT (muy alto)
+            if tiene_guardia_anterior(p.id, fecha):
+                score += 500
+            if tiene_sipat_guardia_anterior(fecha):
+                score += 1000
+
+        # Evitar exceder 3 guardias en el mes
+        if guardias_mes >= 3:
+            score += 10000
+
+        scores.append((p, score))
+
+    # Elegir al azar entre quienes tienen el menor score
+    min_score = min(score for _, score in scores)
+    mejores = [p for p, score in scores if score == min_score]
+    persona_nueva = random.choice(mejores)
+
     exito, mensaje = reasignar_guardia(fecha_str, persona_nueva.id, 'Asignación random')
 
     # Regenerar el mes completo para rebalancear después de la reasignación

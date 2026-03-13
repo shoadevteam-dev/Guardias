@@ -136,6 +136,7 @@ Para probar el balanceo de guardias en un año determinado:
 
 ```bash
 python test_balanceo.py --anio 2026
+python test_balanceo.py --anio 2026 --no-reset
 ```
 
 Esto:
