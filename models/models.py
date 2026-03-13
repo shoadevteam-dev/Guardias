@@ -13,6 +13,7 @@ class Persona(db.Model):
     nombre = db.Column(db.String(100), nullable=False, unique=True)
     activo = db.Column(db.Boolean, default=True)
     acumulado = db.Column(db.Integer, default=0)
+    grado = db.Column(db.String(50), nullable=True)  # Grado SIPAT para personas especiales
     guardias_asignadas = db.relationship('Guardia', backref='persona', lazy=True, foreign_keys='Guardia.persona_id')
     novedades = db.relationship('Novedad', backref='persona', lazy=True)
 

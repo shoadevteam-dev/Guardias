@@ -53,6 +53,55 @@ def tiene_guardia_anterior(persona_id, fecha):
     return guardia is not None
 
 
+def tiene_guardia_dia_medio(persona_id, fecha):
+    """Verifica si la persona tuvo guardia hace 2 días (día por medio)
+
+    Esta validación es para personas SIPAT que no deben tener turnos
+    separados por un día de por medio.
+
+    Args:
+        persona_id: ID de la persona
+        fecha: Fecha actual a validar
+
+    Returns:
+        True si tuvo guardia hace 2 días (fecha - 2), False otherwise
+    """
+    dia_hace_dos = fecha - timedelta(days=2)
+    guardia = Guardia.query.filter_by(
+        persona_id=persona_id,
+        fecha=dia_hace_dos
+    ).first()
+    return guardia is not None
+
+
+def tiene_sipat_guardia_anterior(fecha):
+    """Verifica si algún SIPAT tuvo guardia el día anterior
+
+    Esta validación es para evitar que personas SIPAT tengan guardias
+    consecutivas entre ellos (ej: Fortunato Viernes, Campillay Sábado).
+
+    Args:
+        fecha: Fecha actual a validar
+
+    Returns:
+        True si algún SIPAT tuvo guardia el día anterior (fecha - 1), False otherwise
+    """
+    from models.models import Persona
+    dia_anterior = fecha - timedelta(days=1)
+    
+    # Obtener todos los SIPAT
+    sipats = Persona.query.filter_by(grado='SIPAT').all()
+    sipat_ids = [p.id for p in sipats]
+    
+    # Verificar si algún SIPAT tuvo guardia el día anterior
+    guardia = Guardia.query.filter(
+        Guardia.persona_id.in_(sipat_ids),
+        Guardia.fecha == dia_anterior
+    ).first()
+    
+    return guardia is not None
+
+
 def obtener_rango_mes(mes, anio):
     """Obtiene fecha inicio y fin de un mes"""
     inicio_mes = datetime(anio, mes, 1)

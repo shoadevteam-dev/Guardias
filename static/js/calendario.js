@@ -102,6 +102,7 @@ const CalendarioModule = (function() {
                 html += `
                     <div class="calendar-day ${esFinde ? 'weekend' : ''}">
                         <div class="row align-items-center h-100">
+                            <div class="col text-center">${dia}</div>
                             <div class="col text-center">${diaNombre}</div>
                             <div class="col text-center">${fechaDisplay}</div>
                             <div class="col text-center fw-bold">${personaNombre}</div>

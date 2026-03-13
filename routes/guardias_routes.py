@@ -42,6 +42,12 @@ def get_guardias_mes(mes, anio):
 
     print(f"API /api/guardias/{mes}/{anio}: {len(guardias)} guardias encontradas")
 
+    # Mapeo de días de la semana: 0=Lunes, 1=Martes, ..., 6=Domingo
+    nombres_dias = {
+        0: 'Lunes', 1: 'Martes', 2: 'Miércoles', 3: 'Jueves',
+        4: 'Viernes', 5: 'Sábado', 6: 'Domingo'
+    }
+
     resultado = []
     for g in guardias:
         persona = obtener_persona_por_id(g.persona_id)
@@ -50,7 +56,7 @@ def get_guardias_mes(mes, anio):
             'id': g.id,
             'fecha': g.fecha.strftime('%Y-%m-%d'),
             'fecha_display': g.fecha.strftime('%d/%m/%Y'),
-            'dia_semana': g.fecha.strftime('%A'),
+            'dia_semana': nombres_dias[g.fecha.weekday()],
             'persona_id': g.persona_id,
             'persona_nombre': persona.nombre if persona else 'N/A',
             'tipo': g.tipo,
