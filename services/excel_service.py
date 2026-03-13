@@ -112,10 +112,10 @@ def exportar_guardias_excel(mes, anio):
 
 def _agregar_resumen_excel(wb, personas, guardias, reten_contador,
                            header_font, header_fill, border, center_alignment):
-    """Agrega hoja de resumen al Excel"""
-    ws2 = wb.create_sheet(title="Resumen Retén")
+    """Agrega hoja de resumen al Excel - Solo guardias del mes"""
+    ws2 = wb.create_sheet(title="Resumen Guardias Mes")
 
-    resumen_headers = ['Persona', 'Veces como Retén', 'Guardias Totales', 'Total Servicios']
+    resumen_headers = ['Persona', 'Guardias este Mes']
     for col, header in enumerate(resumen_headers, 1):
         cell = ws2.cell(row=1, column=col, value=header)
         cell.font = header_font
@@ -123,9 +123,9 @@ def _agregar_resumen_excel(wb, personas, guardias, reten_contador,
         cell.alignment = center_alignment
         cell.border = border
 
-    # Calcular estadísticas
+    # Calcular estadísticas - solo guardias del mes
     resumen_dict = {
-        p.id: {'nombre': p.nombre, 'reten': reten_contador.get(p.id, 0), 'guardias': 0}
+        p.id: {'nombre': p.nombre, 'guardias': 0}
         for p in personas
     }
 
@@ -133,24 +133,19 @@ def _agregar_resumen_excel(wb, personas, guardias, reten_contador,
         if g.persona_id in resumen_dict:
             resumen_dict[g.persona_id]['guardias'] += 1
 
-    # Escribir datos
+    # Escribir datos - ordenado por cantidad de guardias (mayor a menor)
     row = 2
     for datos in sorted(
         resumen_dict.values(),
-        key=lambda x: x['reten'] + x['guardias'],
+        key=lambda x: x['guardias'],
         reverse=True
     ):
-        total = datos['reten'] + datos['guardias']
         ws2.cell(row=row, column=1, value=datos['nombre']).border = border
-        ws2.cell(row=row, column=2, value=datos['reten']).border = border
-        ws2.cell(row=row, column=3, value=datos['guardias']).border = border
-        ws2.cell(row=row, column=4, value=total).border = border
+        ws2.cell(row=row, column=2, value=datos['guardias']).border = border
 
-        for col in range(1, 5):
+        for col in range(1, 3):
             ws2.cell(row=row, column=col).alignment = center_alignment
         row += 1
 
-    ws2.column_dimensions['A'].width = 25
+    ws2.column_dimensions['A'].width = 30
     ws2.column_dimensions['B'].width = 18
-    ws2.column_dimensions['C'].width = 18
-    ws2.column_dimensions['D'].width = 18

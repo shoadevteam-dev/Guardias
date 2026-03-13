@@ -8,7 +8,8 @@ from services import (
     reasignar_guardia_random,
     asignar_guardia_manual,
     obtener_guardias_mes,
-    obtener_persona_por_id
+    obtener_persona_por_id,
+    resetear_acumulados
 )
 from services.consultas import obtener_rango_mes
 
@@ -115,19 +116,34 @@ def asignar_manual():
 
 @guardias_bp.route('/<mes>/<anio>/eliminar', methods=['POST'])
 def eliminar_calendario(mes, anio):
-    """Elimina todas las guardias de un mes específico"""
-    from models.models import Guardia, db
+    """Elimina todas las guardias y acumulados de un mes específico"""
+    from models.models import Guardia, HistoricoAcumulado, db
     from services.consultas import obtener_rango_mes
+    from services.guardias_service import eliminar_acumulados_mes
 
     inicio_mes, fin_mes = obtener_rango_mes(int(mes), int(anio))
 
+    # 1. Primero restar acumulados de las personas (antes de borrar el histórico)
+    eliminar_acumulados_mes(int(mes), int(anio))
+
+    # 2. Eliminar guardias del mes
     guardias_eliminadas = Guardia.query.filter(
         Guardia.fecha >= inicio_mes.date(),
         Guardia.fecha <= fin_mes.date()
     ).delete()
 
+    # 3. Eliminar registros históricos del mes
+    HistoricoAcumulado.query.filter_by(mes=int(mes), anio=int(anio)).delete()
+
     db.session.commit()
 
     return jsonify({
-        'message': f'Se eliminaron {guardias_eliminadas} guardias del calendario'
+        'message': f'Se eliminaron {guardias_eliminadas} guardias y acumulados del mes {mes}/{anio}'
     })
+
+
+@guardias_bp.route('/resetear-acumulados', methods=['POST'])
+def resetear_todos_acumulados():
+    """Resetea todos los acumulados a cero"""
+    resetear_acumulados()
+    return jsonify({'message': 'Acumulados reseteados a cero'})
