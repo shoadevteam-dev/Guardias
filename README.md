@@ -119,14 +119,30 @@ Acceder a: http://localhost:5050
 
 ## 🎯 Características
 
-- ✅ Generación automática balanceada
+- ✅ Generación automática balanceada (2-3 guardias/mes por persona)
 - ✅ Reasignación manual y aleatoria
 - ✅ Importación manual día por día
 - ✅ Exportación a Excel con resumen
 - ✅ Gestión de novedades (vacaciones, bajas)
-- ✅ Sistema de acumulados entre meses
+- ✅ Sistema de acumulados entre meses (compensa exceso/falta)
 - ✅ Rotación equitativa de Retén
 - ✅ Calendario visual interactivo
+- ✅ Regla especial: misma persona en 24, 25 y 31 de diciembre
+- ✅ Restricción: no repetir persona en Navidad (25/12) y Año Nuevo (01/01)
+
+## 🧪 Test de balanceo (por año)
+
+Para probar el balanceo de guardias en un año determinado:
+
+```bash
+python test_balanceo.py --anio 2026
+```
+
+Esto:
+
+1. Limpia guardias + acumulados
+2. Genera mes a mes con balanceo
+3. Imprime un resumen anual con el reparto por persona
 
 ## 📊 Excel Exportado
 

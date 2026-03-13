@@ -62,6 +62,23 @@ def generar_guardias_mes(mes, anio):
     # Contador de guardias asignadas en este mes (por persona)
     guardias_mes_dict = {p.id: 0 for p in personas}
 
+    # Guardias acumuladas en el año hasta el mes anterior (para balanceo anual)
+    guardias_acumuladas_ano = {}
+    if mes > 1:
+        for p in personas:
+            guardias_acumuladas_ano[p.id] = sum(
+                contar_guardias_mes(p.id, m, anio) for m in range(1, mes)
+            )
+    else:
+        guardias_acumuladas_ano = {p.id: 0 for p in personas}
+
+    # Días procesados del año hasta el mes anterior (para comparación esperada)
+    dias_anteriores = 0
+    for m in range(1, mes):
+        inicio_m, fin_m = obtener_rango_mes(m, anio)
+        dias_anteriores += (fin_m.date() - inicio_m.date()).days + 1
+    esperado_antes = dias_anteriores / num_personas
+
     # Calcular límite máximo de guardias para cada persona este mes
     # Estrategia: mantener todos entre 2-3 guardias (guardias_por_persona ± 1)
     limite_max_dict = {}
@@ -90,6 +107,22 @@ def generar_guardias_mes(mes, anio):
         limite_min_dict[p.id] = limite_min
 
     # Generar día por día
+    def _evitar_repetir_navidad_y_ano_nuevo(persona_id, fecha_actual):
+        """Evita asignar la misma persona en 24/12, 25/12 y 1/1."""
+        from datetime import date
+
+        fechas_especiales = [(12, 24), (12, 25), (1, 1)]
+        
+        if (fecha_actual.month, fecha_actual.day) in fechas_especiales:
+            for m, d in fechas_especiales:
+                fecha_pasada = date(fecha_actual.year - 1, m, d)
+                if Guardia.query.filter_by(persona_id=persona_id, fecha=fecha_pasada).first():
+                    return True
+        return False
+
+    # Regla especial: una misma persona debe cubrir 24, 25 y 31 de diciembre
+    navidad_persona_id = None
+
     fecha_actual = inicio_mes
     guardias_creadas = 0
 
@@ -97,6 +130,7 @@ def generar_guardias_mes(mes, anio):
         disponibles = obtener_personas_disponibles(fecha_actual.date())
 
         if disponibles:
+
             # Calcular días restantes en el mes
             dias_restantes = (fin_mes.date() - fecha_actual.date()).days + 1
             
@@ -111,7 +145,7 @@ def generar_guardias_mes(mes, anio):
             
             for p in disponibles:
                 guardias_mes = guardias_mes_dict.get(p.id, 0)
-                limite_max = limite_max_dict.get(p.id, guardias_por_persona + 1)
+                limite_max = min(limite_max_dict.get(p.id, guardias_por_persona + 1), 3)
                 limite_min = limite_min_dict.get(p.id, guardias_por_persona - 1)
                 
                 if guardias_mes < limite_min:
@@ -129,57 +163,87 @@ def generar_guardias_mes(mes, anio):
             if not candidatos:
                 candidatos = disponibles
 
+            # Evitar repetir la misma persona en Navidad y Año Nuevo
+            candidatos_filtrados = [p for p in candidatos if not _evitar_repetir_navidad_y_ano_nuevo(p.id, fecha_actual)]
+            if candidatos_filtrados:
+                candidatos = candidatos_filtrados
+
+            # Si no se forzó persona para Navidad (o no estaba disponible), calcular score normal
+            persona_elegida = None
             # Calcular score para cada candidato
-            # PRIORIDAD: quien tiene MÁS acumulado positivo (hizo menos en el año) tiene MÁS prioridad
             scores = []
             for p in candidatos:
-                guardias_mes = guardias_mes_dict.get(p.id, 0)
-                guardias_anterior = guardias_mes_anterior_dict.get(p.id, 0)
-                acumulado = acumulado_dict.get(p.id, 0)
-                limite_min = limite_min_dict.get(p.id, guardias_por_persona - 1)
-                limite_max = limite_max_dict.get(p.id, guardias_por_persona + 1)
+                    guardias_mes = guardias_mes_dict.get(p.id, 0)
+                    guardias_anterior = guardias_mes_anterior_dict.get(p.id, 0)
+                    acumulado = acumulado_dict.get(p.id, 0)
+                    limite_min = limite_min_dict.get(p.id, guardias_por_persona - 1)
+                    limite_max = limite_max_dict.get(p.id, guardias_por_persona + 1)
 
-                # Penalización por guardia consecutiva (muy alta para todos)
-                tiene_consecutiva = 100 if tiene_guardia_anterior(p.id, fecha_actual.date()) else 0
+                    # Penalización por guardia consecutiva (muy alta para todos)
+                    tiene_consecutiva = 100 if tiene_guardia_anterior(p.id, fecha_actual.date()) else 0
 
-                # Penalización por día por medio para personas SIPAT
-                # Campillay, Fortunato y Rivas no deben tener turnos separados por un día
-                # PERO: esta restricción se relaja para mantener balanceo 2-3 guardias
-                tiene_dia_medio = 0
-                if p.grado and 'SIPAT' in p.grado.upper():
-                    # Penalización suave (20) para preferir evitar día por medio
-                    # pero permitirlo si es necesario para mantener balanceo
-                    tiene_dia_medio = 20 if tiene_guardia_dia_medio(p.id, fecha_actual.date()) else 0
+                    # Penalización por día por medio para personas SIPAT
+                    # Campillay, Fortunato y Rivas no deben tener turnos separados por un día
+                    # PERO: esta restricción se relaja para mantener balanceo 2-3 guardias
+                    tiene_dia_medio = 0
+                    if p.grado and 'SIPAT' in p.grado.upper():
+                        # Penalización suave (20) para preferir evitar día por medio
+                        # pero permitirlo si es necesario para mantener balanceo
+                        tiene_dia_medio = 20 if tiene_guardia_dia_medio(p.id, fecha_actual.date()) else 0
 
-                # Penalización EXTRA para SIPAT por día consecutivo (aún más estricta)
-                # Esto asegura que SIPAT nunca tenga guardias consecutivas
-                sipat_consecutiva = 0
-                if p.grado and 'SIPAT' in p.grado.upper():
-                    sipat_consecutiva = 500 if tiene_guardia_anterior(p.id, fecha_actual.date()) else 0
+                    # Penalización EXTRA para SIPAT por día consecutivo (aún más estricta)
+                    # Esto asegura que SIPAT nunca tenga guardias consecutivas
+                    sipat_consecutiva = 0
+                    if p.grado and 'SIPAT' in p.grado.upper():
+                        sipat_consecutiva = 500 if tiene_guardia_anterior(p.id, fecha_actual.date()) else 0
 
-                # Penalización para SIPAT si OTRO SIPAT tuvo guardia ayer
-                # Esto evita que SIPAT tengan guardias consecutivas entre ellos
-                # (ej: Fortunato Viernes, Campillay Sábado, Rivas Domingo)
-                sipat_consecutivo_grupo = 0
-                if p.grado and 'SIPAT' in p.grado.upper():
-                    sipat_consecutivo_grupo = 1000 if tiene_sipat_guardia_anterior(fecha_actual.date()) else 0
+                    # Penalización para SIPAT si OTRO SIPAT tuvo guardia ayer
+                    # Esto evita que SIPAT tengan guardias consecutivas entre ellos
+                    # (ej: Fortunato Viernes, Campillay Sábado, Rivas Domingo)
+                    sipat_consecutivo_grupo = 0
+                    if p.grado and 'SIPAT' in p.grado.upper():
+                        sipat_consecutivo_grupo = 1000 if tiene_sipat_guardia_anterior(fecha_actual.date()) else 0
 
-                # Score: menor es mejor
-                # Factores (en orden de importancia):
-                # 1. Guardias en el mes actual (balanceo dentro del mes)
-                # 2. Acumulado histórico (quien hizo menos en el año tiene prioridad)
-                # 3. Guardias mes anterior (rotación mes a mes)
-                # 4. Restricción SIPAT (no día por medio) - penalización reducida
-                # 5. Restricción SIPAT (no días consecutivos) - penalización muy alta
-                # 6. Restricción SIPAT (no consecutivos entre SIPAT) - penalización máxima
-                score = (guardias_mes * 100) - (acumulado * 10) + (guardias_anterior * 5) + tiene_consecutiva + tiene_dia_medio + sipat_consecutiva + sipat_consecutivo_grupo
-                scores.append((p, score))
+                    # Score: menor es mejor
+                    # Factores (en orden de importancia):
+                    # 1. Guardias en el mes actual (balanceo dentro del mes)
+                    # 2. Balanceo anual (quien ya tiene más guardias en el año tiene menos prioridad)
+                    # 3. Acumulado histórico (quien hizo menos en el año tiene prioridad)
+                    # 4. Guardias mes anterior (rotación mes a mes)
+                    # 5. Restricción SIPAT (no día por medio) - penalización reducida
+                    # 6. Restricción SIPAT (no días consecutivos) - penalización muy alta
+                    # 7. Restricción SIPAT (no consecutivos entre SIPAT) - penalización máxima
+                    desbalance_total = guardias_acumuladas_ano.get(p.id, 0) - esperado_antes
+                    # Penalizar fuertemente si ya llegó al máximo absoluto (3 guardias mensuales)
+                    penalizacion_maximo_absoluto = 10000 if guardias_mes >= 3 else 0
+
+                    # Penalizar si es 25 o 31 de diciembre y es la misma persona que el 24
+                    penalizacion_navidad_repetida = 10000 if (fecha_actual.month == 12 and fecha_actual.day in (25, 31) and navidad_persona_id and p.id == navidad_persona_id) else 0
+
+                    score = (
+                        guardias_mes * 100
+                        + desbalance_total * 50
+                        - (acumulado * 10)
+                        + (guardias_anterior * 5)
+                        + tiene_consecutiva
+                        + tiene_dia_medio
+                        + sipat_consecutiva
+                        + sipat_consecutivo_grupo
+                        + penalizacion_maximo_absoluto
+                        + penalizacion_navidad_repetida
+                    )
+                    scores.append((p, score))
 
             # Ordenar por score (menor primero = más prioridad)
             scores.sort(key=lambda x: x[1])
 
             # Elegir al primero (menor score = más prioridad)
             persona_elegida = scores[0][0]
+
+            # Si es 24 de diciembre, recordar esa persona para penalizar en 25 y 31
+            if fecha_actual.month == 12 and fecha_actual.day == 24:
+                navidad_persona_id = persona_elegida.id
+
             guardia = Guardia(
                 fecha=fecha_actual.date(),
                 persona_id=persona_elegida.id,
