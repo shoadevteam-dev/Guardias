@@ -73,8 +73,6 @@ def generar_guardias_mes(mes, anio):
         # Límite base: todos entre (promedio - 1) y (promedio + 1)
         limite_min = max(0, guardias_por_persona - 1)
         limite_max = guardias_por_persona + 1
-        if guardias_extra > 0:
-            limite_max += 1
 
         # Ajustes suaves por acumulado histórico
         if acumulado < 0:
@@ -263,10 +261,7 @@ def _normalizar_acumulados(acumulados_dict):
     
     Estrategia:
     1. Calcular la media y restarla para centrar en 0
-    2. Redondear a valores discretos: -1, 0, 1
-       - Si valor < -0.5 → -1 (hizo más guardias, menos prioridad)
-       - Si -0.5 <= valor <= 0.5 → 0 (balanceado)
-       - Si valor > 0.5 → 1 (hizo menos guardias, más prioridad)
+    2. Redondear al entero más cercano y clamp a [-1, 0, 1]
     
     Significado del acumulado:
     - +1: Hizo menos guardias → tiene MÁS prioridad para el próximo mes
@@ -283,15 +278,12 @@ def _normalizar_acumulados(acumulados_dict):
     media = sum(valores) / n
     centrados = {pid: val - media for pid, val in acumulados_dict.items()}
     
-    # Paso 2: Redondear a valores discretos -1, 0, 1
+    # Paso 2: Redondear al entero más cercano y clamp a -1, 0, 1
     normalizados = {}
     for pid, val in centrados.items():
-        if val < -0.5:
-            normalizados[pid] = -1
-        elif val > 0.5:
-            normalizados[pid] = 1
-        else:
-            normalizados[pid] = 0
+        rounded = round(val)
+        clamped = max(-1, min(1, rounded))
+        normalizados[pid] = clamped
     
     return normalizados
 
@@ -480,7 +472,7 @@ def calcular_acumulados(mes, anio):
         historico.acumulado = diferencia
         db.session.add(historico)
 
-    # Normalizar acumulados para que estén en rango [-2, 2] y media 0
+    # Normalizar acumulados para que estén en rango [-1, 0, 1] y media 0
     acumulados_normalizados = _normalizar_acumulados(acumulados_temp)
 
     # Aplicar acumulados normalizados
@@ -528,6 +520,9 @@ def reasignar_guardia(fecha_str, persona_id_nuevo, motivo=''):
     guardia.tipo = 'suplencia'
 
     db.session.commit()
+
+    # Recalcular acumulados para mantener el balanceo
+    calcular_acumulados(fecha.month, fecha.year)
     return True, "Guardia reasignada exitosamente"
 
 
@@ -548,6 +543,10 @@ def reasignar_guardia_random(fecha_str):
     persona_nueva = random.choice(disponibles)
     exito, mensaje = reasignar_guardia(fecha_str, persona_nueva.id, 'Asignación random')
 
+    # Regenerar el mes completo para rebalancear después de la reasignación
+    if exito:
+        generar_guardias_mes(fecha.month, fecha.year)
+
     persona_original = Persona.query.get(persona_original_id)
     return exito, mensaje, persona_original.nombre if persona_original else None, persona_nueva.nombre
 
@@ -565,6 +564,10 @@ def asignar_guardia_manual(fecha_str, persona_id):
         db.session.add(guardia)
 
     db.session.commit()
+
+    # Recalcular acumulados para mantener el balanceo
+    calcular_acumulados(fecha.month, fecha.year)
+
     return True, "Guardia asignada manualmente"
 
 
