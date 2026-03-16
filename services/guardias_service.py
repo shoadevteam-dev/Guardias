@@ -39,6 +39,14 @@ def generar_guardias_mes(mes, anio):
         print(f"No hay personas activas")
         return False
 
+    # Si estamos generando el primer mes del año, reiniciamos los acumulados
+    # para que el balance comience limpio al iniciar un nuevo año.
+    if mes == 1:
+        HistoricoAcumulado.query.filter_by(anio=anio).delete()
+        for p in personas:
+            p.acumulado = 0
+        db.session.commit()
+
     num_personas = len(personas)
     num_dias = (fin_mes.date() - inicio_mes.date()).days + 1
     guardias_por_persona = num_dias // num_personas
@@ -338,17 +346,14 @@ def _normalizar_acumulados(acumulados_dict):
     valores = list(acumulados_dict.values())
     n = len(valores)
     
-    # Paso 1: Centrar en 0 (restar la media)
-    media = sum(valores) / n
-    centrados = {pid: val - media for pid, val in acumulados_dict.items()}
-    
-    # Paso 2: Redondear al entero más cercano y clamp a -1, 0, 1
+    # Redondear al entero más cercano y clamp a -1, 0, 1
+    # (No se altera el signado original, para que 0 siga siendo 0)
     normalizados = {}
-    for pid, val in centrados.items():
+    for pid, val in acumulados_dict.items():
         rounded = round(val)
         clamped = max(-1, min(1, rounded))
         normalizados[pid] = clamped
-    
+
     return normalizados
 
 
@@ -604,13 +609,30 @@ def reasignar_guardia_random(fecha_str):
     if not disponibles:
         return False, "No hay personas disponibles", None, None
 
+    # Preferir candidatos que cumplen las reglas SIPAT (día por medio / consecutivos).
+    # Si hay al menos uno válido, descartamos a quienes violan las reglas.
+    candidatos = disponibles
+    candidatos_sipat_validos = []
+    for p in candidatos:
+        if p.grado and 'SIPAT' in p.grado.upper():
+            # Si viola alguna regla SIPAT, no es candidato válido
+            if tiene_guardia_dia_medio(p.id, fecha):
+                continue
+            if tiene_guardia_anterior(p.id, fecha):
+                continue
+            if tiene_sipat_guardia_anterior(fecha):
+                continue
+        candidatos_sipat_validos.append(p)
+
+    if candidatos_sipat_validos:
+        candidatos = candidatos_sipat_validos
+
     # Seleccionar aleatoriamente entre los candidatos que tienen menos guardias en el mes
-    # y que respetan las restricciones SIPAT (día por medio / consecutivos).
-    # Esto evita que la reasignación elija a alguien con demasiadas guardias.
+    # y que respetan las restricciones SIPAT.
     mes = fecha.month
     anio = fecha.year
     scores = []
-    for p in disponibles:
+    for p in candidatos:
         guardias_mes = contar_guardias_mes(p.id, mes, anio)
 
         # Base: menos guardias en el mes es mejor
@@ -641,9 +663,9 @@ def reasignar_guardia_random(fecha_str):
 
     exito, mensaje = reasignar_guardia(fecha_str, persona_nueva.id, 'Asignación random')
 
-    # Regenerar el mes completo para rebalancear después de la reasignación
+    # Recalcular acumulados del mes para mantener balanceo tras la reasignación
     if exito:
-        generar_guardias_mes(fecha.month, fecha.year)
+        calcular_acumulados(fecha.month, fecha.year)
 
     persona_original = Persona.query.get(persona_original_id)
     return exito, mensaje, persona_original.nombre if persona_original else None, persona_nueva.nombre
