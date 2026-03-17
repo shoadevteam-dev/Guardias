@@ -17,8 +17,8 @@ from .guardias_service import (
     reasignar_guardia,
     reasignar_guardia_random,
     asignar_guardia_manual,
-    importar_guardias_desde_lista,
-    resetear_acumulados
+    resetear_acumulados,
+    eliminar_acumulados_mes
 )
 from .excel_service import exportar_guardias_excel
 from .init_data import init_database, PERSONAS_DEFAULT
@@ -39,8 +39,8 @@ __all__ = [
     'reasignar_guardia',
     'reasignar_guardia_random',
     'asignar_guardia_manual',
-    'importar_guardias_desde_lista',
     'resetear_acumulados',
+    'eliminar_acumulados_mes',
     # Excel
     'exportar_guardias_excel',
     # Inicialización
