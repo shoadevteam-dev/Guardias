@@ -67,22 +67,20 @@ def get_guardias_mes(mes, anio):
         disponibles = obtener_personas_disponibles(g.fecha, exclude_id=g.persona_id)
         reten_nombre = 'SIN RETÉN'
         if disponibles:
-            # Filtrar personas que fueron retén el día anterior o siguiente
+            # Filtrar personas que fueron retén el día anterior
+            # Nota: Solo verificamos el día anterior porque procesamos en orden cronológico
             dia_anterior = g.fecha - timedelta(days=1)
-            dia_siguiente = g.fecha + timedelta(days=1)
-            
+
             candidatos = []
             for p in disponibles:
                 # Verificar si fue retén el día anterior
                 fue_reten_anterior = reten_fechas_dict.get((p.id, dia_anterior), False)
-                # Verificar si fue retén el día siguiente (ya procesado)
-                fue_reten_siguiente = reten_fechas_dict.get((p.id, dia_siguiente), False)
-                
-                # Solo agregar si NO fue retén ni antes ni después
-                if not fue_reten_anterior and not fue_reten_siguiente:
+
+                # Solo agregar si NO fue retén el día anterior
+                if not fue_reten_anterior:
                     candidatos.append(p)
-            
-            # Si no hay candidatos (todos tuvieron retén antes/después), usar todos los disponibles
+
+            # Si no hay candidatos (todos tuvieron retén ayer), usar todos los disponibles
             if not candidatos:
                 candidatos = disponibles
             

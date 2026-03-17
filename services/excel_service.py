@@ -79,19 +79,19 @@ def exportar_guardias_excel(mes, anio):
             )
 
             if disponibles:
-                # Filtrar personas que fueron retén el día anterior o siguiente
+                # Filtrar personas que fueron retén el día anterior
+                # Nota: Solo verificamos el día anterior porque procesamos en orden cronológico
                 dia_anterior = fecha_actual.date() - timedelta(days=1)
-                dia_siguiente = fecha_actual.date() + timedelta(days=1)
-                
+
                 candidatos = []
                 for p in disponibles:
                     fue_reten_anterior = reten_fechas_dict.get((p.id, dia_anterior), False)
-                    fue_reten_siguiente = reten_fechas_dict.get((p.id, dia_siguiente), False)
-                    
-                    if not fue_reten_anterior and not fue_reten_siguiente:
+
+                    # Solo agregar si NO fue retén el día anterior
+                    if not fue_reten_anterior:
                         candidatos.append(p)
-                
-                # Si no hay candidatos, usar todos los disponibles
+
+                # Si no hay candidatos (todos tuvieron retén ayer), usar todos los disponibles
                 if not candidatos:
                     candidatos = disponibles
                 
