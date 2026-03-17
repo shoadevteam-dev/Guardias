@@ -59,6 +59,9 @@ def exportar_guardias_excel(mes, anio):
     # Datos
     personas_activas = Persona.query.filter_by(activo=True).all()
     reten_contador = {p.id: 0 for p in personas_activas}
+    
+    # Tracking de retén para evitar consecutivos
+    reten_fechas_dict = {}
 
     row = 2
     fecha_actual = inicio_mes
@@ -76,9 +79,28 @@ def exportar_guardias_excel(mes, anio):
             )
 
             if disponibles:
-                disponibles.sort(key=lambda p: reten_contador.get(p.id, 0))
-                persona_reten = disponibles[0]
+                # Filtrar personas que fueron retén el día anterior o siguiente
+                dia_anterior = fecha_actual.date() - timedelta(days=1)
+                dia_siguiente = fecha_actual.date() + timedelta(days=1)
+                
+                candidatos = []
+                for p in disponibles:
+                    fue_reten_anterior = reten_fechas_dict.get((p.id, dia_anterior), False)
+                    fue_reten_siguiente = reten_fechas_dict.get((p.id, dia_siguiente), False)
+                    
+                    if not fue_reten_anterior and not fue_reten_siguiente:
+                        candidatos.append(p)
+                
+                # Si no hay candidatos, usar todos los disponibles
+                if not candidatos:
+                    candidatos = disponibles
+                
+                candidatos.sort(key=lambda p: reten_contador.get(p.id, 0))
+                persona_reten = candidatos[0]
                 reten = persona_reten.nombre
+                
+                # Registrar retén
+                reten_fechas_dict[(persona_reten.id, fecha_actual.date())] = True
                 reten_contador[persona_reten.id] = reten_contador.get(persona_reten.id, 0) + 1
             else:
                 reten = 'SIN RETÉN'

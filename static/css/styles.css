@@ -30,7 +30,7 @@
 }
 
 .calendar-day {
-    min-height: 100px;
+    min-height: 80px;
     border: 1px solid #dee2e6;
     transition: background-color 0.2s;
 }

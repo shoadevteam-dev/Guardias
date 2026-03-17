@@ -2,6 +2,7 @@
 Rutas API para Guardias
 """
 from flask import Blueprint, request, jsonify
+from datetime import timedelta
 from services import (
     generar_guardias_mes,
     reasignar_guardia,
@@ -11,7 +12,8 @@ from services import (
     obtener_persona_por_id,
     resetear_acumulados
 )
-from services.consultas import obtener_rango_mes
+from services.consultas import obtener_rango_mes, obtener_personas_disponibles
+from models.models import Persona, Guardia
 
 guardias_bp = Blueprint('guardias', __name__, url_prefix='/api/guardias')
 
@@ -36,7 +38,7 @@ def generar_guardias():
 
 @guardias_bp.route('/<mes>/<anio>', methods=['GET'])
 def get_guardias_mes(mes, anio):
-    """Obtiene las guardias de un mes"""
+    """Obtiene las guardias de un mes con información de retén"""
     inicio_mes, fin_mes = obtener_rango_mes(int(mes), int(anio))
     guardias = obtener_guardias_mes(int(mes), int(anio))
 
@@ -48,10 +50,51 @@ def get_guardias_mes(mes, anio):
         4: 'Viernes', 5: 'Sábado', 6: 'Domingo'
     }
 
+    # Contador para rotación de retén
+    personas_activas = Persona.query.filter_by(activo=True).all()
+    reten_contador = {p.id: 0 for p in personas_activas}
+    
+    # Diccionario para tracking de retén por persona (para evitar consecutivos)
+    # Clave: (persona_id, fecha), Valor: True si fue retén esa fecha
+    reten_fechas_dict = {}
+
     resultado = []
     for g in guardias:
         persona = obtener_persona_por_id(g.persona_id)
         persona_original = obtener_persona_por_id(g.persona_original_id) if g.persona_original_id else None
+
+        # Calcular retén (persona disponible que no es el titular)
+        disponibles = obtener_personas_disponibles(g.fecha, exclude_id=g.persona_id)
+        reten_nombre = 'SIN RETÉN'
+        if disponibles:
+            # Filtrar personas que fueron retén el día anterior o siguiente
+            dia_anterior = g.fecha - timedelta(days=1)
+            dia_siguiente = g.fecha + timedelta(days=1)
+            
+            candidatos = []
+            for p in disponibles:
+                # Verificar si fue retén el día anterior
+                fue_reten_anterior = reten_fechas_dict.get((p.id, dia_anterior), False)
+                # Verificar si fue retén el día siguiente (ya procesado)
+                fue_reten_siguiente = reten_fechas_dict.get((p.id, dia_siguiente), False)
+                
+                # Solo agregar si NO fue retén ni antes ni después
+                if not fue_reten_anterior and not fue_reten_siguiente:
+                    candidatos.append(p)
+            
+            # Si no hay candidatos (todos tuvieron retén antes/después), usar todos los disponibles
+            if not candidatos:
+                candidatos = disponibles
+            
+            # Ordenar por contador de retén (menor primero para rotación equitativa)
+            candidatos.sort(key=lambda p: reten_contador.get(p.id, 0))
+            persona_reten = candidatos[0]
+            reten_nombre = persona_reten.nombre
+            
+            # Registrar que esta persona fue retén en esta fecha
+            reten_fechas_dict[(persona_reten.id, g.fecha)] = True
+            reten_contador[persona_reten.id] = reten_contador.get(persona_reten.id, 0) + 1
+
         resultado.append({
             'id': g.id,
             'fecha': g.fecha.strftime('%Y-%m-%d'),
@@ -59,6 +102,7 @@ def get_guardias_mes(mes, anio):
             'dia_semana': nombres_dias[g.fecha.weekday()],
             'persona_id': g.persona_id,
             'persona_nombre': persona.nombre if persona else 'N/A',
+            'reten_nombre': reten_nombre,
             'tipo': g.tipo,
             'es_suplencia': g.es_suplencia,
             'persona_original_nombre': persona_original.nombre if persona_original else None

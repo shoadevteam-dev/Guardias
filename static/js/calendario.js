@@ -94,6 +94,7 @@ const CalendarioModule = (function() {
                 }
                 
                 const personaNombre = guardia ? guardia.persona_nombre : 'SIN ASIGNAR';
+                const retenNombre = guardia ? guardia.reten_nombre : 'SIN RETÉN';
                 const tipo = guardia ? guardia.tipo : '-';
                 const tipoClass = guardia
                     ? (guardia.es_suplencia ? 'suplencia-badge' : guardia.tipo === 'reten' ? 'reten-badge' : 'bg-primary')
@@ -106,6 +107,7 @@ const CalendarioModule = (function() {
                             <div class="col text-center">${diaNombre}</div>
                             <div class="col text-center">${fechaDisplay}</div>
                             <div class="col text-center fw-bold">${personaNombre}</div>
+                            <div class="col text-center">${retenNombre}</div>
                             <div class="col text-center">
                                 ${guardia ? `<span class="badge ${tipoClass}">${tipo.toUpperCase()}</span>` : '-'}
                             </div>
