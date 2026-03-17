@@ -62,6 +62,21 @@ def exportar_guardias_excel(mes, anio):
     
     # Tracking de retén para evitar consecutivos
     reten_fechas_dict = {}
+    
+    # Tracking adicional para SIPAT: si un SIPAT fue retén ayer, ningún SIPAT puede ser retén hoy
+    sipat_reten_fechas = set()  # Fechas donde un SIPAT fue retén
+    
+    # Tracking de fechas donde los SIPAT tienen guardia (para evitar que sean retenes el día anterior)
+    sipat_guardia_fechas = {}  # {persona_id: set(fechas)}
+    for g in guardias:
+        if g.persona_id not in sipat_guardia_fechas:
+            sipat_guardia_fechas[g.persona_id] = set()
+        sipat_guardia_fechas[g.persona_id].add(g.fecha)
+    
+    # Crear un set de todas las fechas donde cualquier SIPAT tiene guardia
+    todas_sipat_guardia_fechas = set()
+    for fechas in sipat_guardia_fechas.values():
+        todas_sipat_guardia_fechas.update(fechas)
 
     row = 2
     fecha_actual = inicio_mes
@@ -79,29 +94,81 @@ def exportar_guardias_excel(mes, anio):
             )
 
             if disponibles:
-                # Filtrar personas que fueron retén el día anterior
-                # Nota: Solo verificamos el día anterior porque procesamos en orden cronológico
+                # Filtrar personas que fueron retén el día anterior o serán retén el día siguiente
+                # para evitar retenes consecutivos (ni antes ni después)
                 dia_anterior = fecha_actual.date() - timedelta(days=1)
+                dia_siguiente = fecha_actual.date() + timedelta(days=1)
+
+                # Verificar si la persona de guardia es SIPAT
+                persona_guardia = Persona.query.get(guardia.persona_id)
+                es_guardia_sipat = persona_guardia and persona_guardia.grado and 'SIPAT' in persona_guardia.grado.upper()
+
+                # Verificar si algún SIPAT fue retén el día anterior
+                hubo_sipat_reten_ayer = dia_anterior in sipat_reten_fechas
+
+                # Verificar si algún SIPAT fue retén hace 2 días (para evitar días alternos)
+                dia_hace_2 = fecha_actual.date() - timedelta(days=2)
+                hubo_sipat_reten_hace_2 = dia_hace_2 in sipat_reten_fechas
+                
+                # Verificar si algún SIPAT tiene guardia hoy, ayer o mañana
+                hay_sipat_guardia_hoy = fecha_actual.date() in todas_sipat_guardia_fechas
+                hay_sipat_guardia_ayer = dia_anterior in todas_sipat_guardia_fechas
+                hay_sipat_guardia_manana = dia_siguiente in todas_sipat_guardia_fechas
 
                 candidatos = []
                 for p in disponibles:
                     fue_reten_anterior = reten_fechas_dict.get((p.id, dia_anterior), False)
 
-                    # Solo agregar si NO fue retén el día anterior
-                    if not fue_reten_anterior:
+                    # Verificar si será retén el día siguiente (ya asignado en iteración anterior)
+                    fue_reten_siguiente = reten_fechas_dict.get((p.id, dia_siguiente), False)
+
+                    # Si la guardia es de un SIPAT, el retén no puede ser otro SIPAT
+                    es_reten_sipat = p.grado and p.grado.upper().find('SIPAT') >= 0
+                    if es_guardia_sipat and es_reten_sipat:
+                        continue
+
+                    # Si un SIPAT fue retén ayer, ningún SIPAT puede ser retén hoy
+                    if hubo_sipat_reten_ayer and es_reten_sipat:
+                        continue
+
+                    # Si un SIPAT fue retén hace 2 días, ningún SIPAT puede ser retén hoy
+                    if hubo_sipat_reten_hace_2 and es_reten_sipat:
+                        continue
+                    
+                    # Si hay guardia de SIPAT hoy, ayer o mañana, ningún SIPAT puede ser retén hoy
+                    if es_reten_sipat and (hay_sipat_guardia_hoy or hay_sipat_guardia_ayer or hay_sipat_guardia_manana):
+                        continue
+
+                    # Si este SIPAT tiene guardia mañana, no puede ser retén hoy
+                    if p.id in sipat_guardia_fechas and dia_siguiente in sipat_guardia_fechas[p.id]:
+                        continue
+
+                    # Si este SIPAT tuvo guardia ayer, no puede ser retén hoy
+                    if p.id in sipat_guardia_fechas and dia_anterior in sipat_guardia_fechas[p.id]:
+                        continue
+
+                    # Solo agregar si NO fue retén ni antes ni después
+                    if not fue_reten_anterior and not fue_reten_siguiente:
                         candidatos.append(p)
 
-                # Si no hay candidatos (todos tuvieron retén ayer), usar todos los disponibles
+                # Si no hay candidatos (todos tuvieron retén ayer o mañana), usar todos los disponibles
                 if not candidatos:
                     candidatos = disponibles
-                
+
                 candidatos.sort(key=lambda p: reten_contador.get(p.id, 0))
                 persona_reten = candidatos[0]
                 reten = persona_reten.nombre
                 
+                # Recalcular si el retén seleccionado es SIPAT
+                es_reten_sipat = persona_reten.grado and 'SIPAT' in persona_reten.grado.upper()
+
                 # Registrar retén
                 reten_fechas_dict[(persona_reten.id, fecha_actual.date())] = True
                 reten_contador[persona_reten.id] = reten_contador.get(persona_reten.id, 0) + 1
+                
+                # Registrar si un SIPAT fue retén hoy
+                if es_reten_sipat:
+                    sipat_reten_fechas.add(fecha_actual.date())
             else:
                 reten = 'SIN RETÉN'
         else:

@@ -1,0 +1,28 @@
+App imported
+App created
+ * Serving Flask app 'app'
+ * Debug mode: off
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5050
+ * Running on http://192.168.0.85:5050
+Press CTRL+C to quit
+127.0.0.1 - - [17/Mar/2026 17:57:29] "GET /api/guardias/1/2026 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /static/css/styles.css HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /static/js/acumulados.js HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /static/js/personas.js HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /static/js/novedades.js HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /static/js/calendario.js HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /static/js/importar.js HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /static/js/reasignar.js HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /api/guardias/3/2026 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /api/novedades HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /api/acumulados HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /api/personas HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:58:07] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [17/Mar/2026 17:58:09] "GET /api/guardias/1/2026 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:59:14] "GET /api/guardias/2/2026 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:59:16] "POST /api/guardias/generar HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:59:17] "GET /api/guardias/2/2026 HTTP/1.1" 200 -
+127.0.0.1 - - [17/Mar/2026 17:59:17] "GET /api/acumulados HTTP/1.1" 200 -

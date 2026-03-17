@@ -10,6 +10,7 @@ from services.consultas import (
     tiene_guardia_anterior,
     tiene_guardia_dia_medio,
     tiene_sipat_guardia_anterior,
+    tuvo_sipat_guardia_en_rango,
     obtener_rango_mes
 )
 
@@ -99,14 +100,17 @@ def generar_guardias_mes(mes, anio):
                     + (100 if tiene_guardia_anterior(p.id, fecha_actual.date()) else 0)
                 )
 
-                # Restricciones SIPAT
+                # Restricciones SIPAT - No consecutivos ni antes ni después
                 if p.grado and 'SIPAT' in p.grado.upper():
                     if tiene_guardia_dia_medio(p.id, fecha_actual.date()):
                         score += 20
                     if tiene_guardia_anterior(p.id, fecha_actual.date()):
                         score += 500
+                    # Si algún SIPAT tuvo guardia ayer, evitar que otro SIPAT tenga hoy
                     if tiene_sipat_guardia_anterior(fecha_actual.date()):
                         score += 1000
+                    # Si algún SIPAT tiene guardia hoy, evitar que otro SIPAT tenga mañana
+                    # (esto se aplica cuando se asigna la guardia del día siguiente)
 
                 if guardias_mes >= 3:
                     score += 10000
@@ -300,6 +304,9 @@ def reasignar_guardia_random(fecha_str):
     for p in disponibles:
         if p.grado and 'SIPAT' in p.grado.upper():
             if tiene_guardia_dia_medio(p.id, fecha) or tiene_guardia_anterior(p.id, fecha):
+                continue
+            # Si algún SIPAT tuvo guardia el día anterior, evitar que este SIPAT tenga hoy
+            if tiene_sipat_guardia_anterior(fecha):
                 continue
         candidatos.append(p)
 

@@ -99,17 +99,46 @@ def tiene_sipat_guardia_anterior(fecha):
     """
     from models.models import Persona
     dia_anterior = fecha - timedelta(days=1)
-    
+
     # Obtener todos los SIPAT
     sipats = Persona.query.filter_by(grado='SIPAT').all()
     sipat_ids = [p.id for p in sipats]
-    
+
     # Verificar si algún SIPAT tuvo guardia el día anterior
     guardia = Guardia.query.filter(
         Guardia.persona_id.in_(sipat_ids),
         Guardia.fecha == dia_anterior
     ).first()
+
+    return guardia is not None
+
+
+def tuvo_sipat_guardia_en_rango(fecha_inicio, fecha_fin):
+    """Verifica si algún SIPAT tuvo guardia en un rango de fechas
+
+    Esta validación es para evitar que personas SIPAT tengan guardias
+    consecutivas entre ellos.
+
+    Args:
+        fecha_inicio: Fecha de inicio del rango (inclusive)
+        fecha_fin: Fecha de fin del rango (inclusive)
+
+    Returns:
+        True si algún SIPAT tuvo guardia en el rango, False otherwise
+    """
+    from models.models import Persona
     
+    # Obtener todos los SIPAT
+    sipats = Persona.query.filter_by(grado='SIPAT').all()
+    sipat_ids = [p.id for p in sipats]
+
+    # Verificar si algún SIPAT tuvo guardia en el rango
+    guardia = Guardia.query.filter(
+        Guardia.persona_id.in_(sipat_ids),
+        Guardia.fecha >= fecha_inicio,
+        Guardia.fecha <= fecha_fin
+    ).first()
+
     return guardia is not None
 
 
