@@ -330,11 +330,15 @@ def _imprimir_balanceo_anual(personas, guardias_mes_dict, guardias_mes_anterior_
 
 def _normalizar_acumulados(acumulados_dict):
     """Normaliza los acumulados para mantenerlos en valores discretos [-1, 0, 1] con media 0
-    
+
     Estrategia:
-    1. Calcular la media y restarla para centrar en 0
-    2. Redondear al entero más cercano y clamp a [-1, 0, 1]
-    
+    1. Calcular la media de los acumulados
+    2. Restar la media para centrar en 0
+    3. Usar umbrales fijos para asignar -1, 0, 1:
+       - Si valor < -0.25 → -1 (hizo más guardias)
+       - Si valor > 0.25 → +1 (hizo menos guardias)
+       - Si no → 0 (balanceado)
+
     Significado del acumulado:
     - +1: Hizo menos guardias → tiene MÁS prioridad para el próximo mes
     - 0: Guardias balanceadas
@@ -342,17 +346,25 @@ def _normalizar_acumulados(acumulados_dict):
     """
     if not acumulados_dict:
         return {}
-    
+
     valores = list(acumulados_dict.values())
     n = len(valores)
     
-    # Redondear al entero más cercano y clamp a -1, 0, 1
-    # (No se altera el signado original, para que 0 siga siendo 0)
+    # Calcular media
+    media = sum(valores) / n
+    
+    # Restar media y aplicar umbrales fijos
     normalizados = {}
     for pid, val in acumulados_dict.items():
-        rounded = round(val)
-        clamped = max(-1, min(1, rounded))
-        normalizados[pid] = clamped
+        centrado = val - media
+        
+        # Umbrales fijos para determinar -1, 0, 1
+        if centrado < -0.25:
+            normalizados[pid] = -1  # Hizo más guardias que el promedio
+        elif centrado > 0.25:
+            normalizados[pid] = 1   # Hizo menos guardias que el promedio
+        else:
+            normalizados[pid] = 0   # Balanceado
 
     return normalizados
 
@@ -509,7 +521,10 @@ def calcular_acumulados(mes, anio):
     - POSITIVO = hizo MENOS guardias que el promedio (tiene prioridad para el próximo mes)
     - NEGATIVO = hizo MÁS guardias que el promedio (tiene menos prioridad para el próximo mes)
 
-    El acumulado se normaliza para mantenerse en rango [-2, 2] con media 0.
+    El acumulado se normaliza para mantenerse en rango [-1, 0, 1] con media 0.
+    
+    Nota: El acumulado es histórico acumulativo - se suma la diferencia de cada mes
+    para llevar un registro de quién debe guardias a lo largo del año.
     """
     personas = Persona.query.filter_by(activo=True).all()
     if not personas:
@@ -518,27 +533,32 @@ def calcular_acumulados(mes, anio):
     total_guardias = sum(contar_guardias_mes(p.id, mes, anio) for p in personas)
     promedio = total_guardias / len(personas)
 
-    # Primero calcular los nuevos acumulados
+    # Calcular la suma de diferencias históricas desde el histórico de la DB
+    # (no usamos p.acumulado porque ya está normalizado y distorsiona)
     acumulados_temp = {}
     for p in personas:
         guardias = contar_guardias_mes(p.id, mes, anio)
 
-        # Diferencia = promedio - guardias_hechas
+        # Diferencia = promedio - guardias_hechas (sin redondear)
         # Si hizo MÁS que el promedio → diferencia NEGATIVA (menos prioridad)
         # Si hizo MENOS que el promedio → diferencia POSITIVA (más prioridad)
-        diferencia = round(promedio - guardias)
+        diferencia = promedio - guardias
 
-        # Sumar al acumulado existente (acumulativo histórico)
-        acumulado_anterior = p.acumulado or 0
-        acumulados_temp[p.id] = acumulado_anterior + diferencia
+        # Obtener el acumulado histórico REAL sumando todo el histórico de la DB
+        historicos = HistoricoAcumulado.query.filter_by(persona_id=p.id).all()
+        acumulado_historico_real = sum(h.acumulado for h in historicos if h.mes != mes or h.anio != anio)
+        
+        # Sumar diferencia actual al histórico real
+        acumulados_temp[p.id] = acumulado_historico_real + diferencia
 
+        # Actualizar o crear registro histórico para este mes
         historico = HistoricoAcumulado.query.filter_by(
             persona_id=p.id, mes=mes, anio=anio
         ).first()
         if not historico:
             historico = HistoricoAcumulado(persona_id=p.id, mes=mes, anio=anio)
 
-        historico.acumulado = diferencia
+        historico.acumulado = round(diferencia)  # Guardar diferencia redondeada en histórico
         db.session.add(historico)
 
     # Normalizar acumulados para que estén en rango [-1, 0, 1] y media 0
@@ -549,16 +569,16 @@ def calcular_acumulados(mes, anio):
         p.acumulado = acumulados_normalizados.get(p.id, 0)
 
     db.session.commit()
-    
+
     # Imprimir resumen de acumulados
     print(f"\n=== Acumulados calculados para {mes}/{anio} ===")
     print(f"{'Persona':<25} {'Guardias':<10} {'Promedio':<10} {'Diferencia':<12} {'Nuevo Acum':<10}")
     print("-" * 70)
     for p in personas:
         guardias = contar_guardias_mes(p.id, mes, anio)
-        diferencia = round(promedio - guardias)
+        diferencia = promedio - guardias
         acumulado = p.acumulado or 0
-        print(f"{p.nombre:<25} {guardias:<10} {promedio:<10.1f} {diferencia:<12} {acumulado:<10.2f}")
+        print(f"{p.nombre:<25} {guardias:<10} {promedio:<10.1f} {diferencia:<12.2f} {acumulado:<10}")
     print("=" * 70)
 
 
