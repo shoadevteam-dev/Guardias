@@ -29,18 +29,35 @@ def obtener_personas_disponibles(fecha, exclude_id=None):
 
 
 def contar_guardias_mes(persona_id, mes, anio):
-    """Cuenta las guardias de una persona en un mes específico"""
+    """Cuenta las guardias de una persona en un mes específico
+
+    Incluye:
+    1. Guardias donde la persona es el titular actual (persona_id)
+    2. Guardias donde la persona fue el original reemplazado (persona_original_id)
+       Esto asegura que el acumulado refleje las guardias que cada uno debía hacer,
+       no las que finalmente hizo tras un reemplazo.
+    """
     inicio_mes = datetime(anio, mes, 1)
     if mes == 12:
         fin_mes = datetime(anio + 1, 1, 1) - timedelta(days=1)
     else:
         fin_mes = datetime(anio, mes + 1, 1) - timedelta(days=1)
 
-    return Guardia.query.filter(
+    # Contar guardias actuales (como titular)
+    guardias_actuales = Guardia.query.filter(
         Guardia.persona_id == persona_id,
         Guardia.fecha >= inicio_mes.date(),
         Guardia.fecha <= fin_mes.date()
     ).count()
+
+    # Contar guardias donde fue reemplazado (como original)
+    guardias_reemplazado = Guardia.query.filter(
+        Guardia.persona_original_id == persona_id,
+        Guardia.fecha >= inicio_mes.date(),
+        Guardia.fecha <= fin_mes.date()
+    ).count()
+
+    return guardias_actuales + guardias_reemplazado
 
 
 def tiene_guardia_anterior(persona_id, fecha):
