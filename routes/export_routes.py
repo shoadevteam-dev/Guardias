@@ -3,7 +3,7 @@ Rutas API para Exportación y Acumulados
 """
 from flask import Blueprint, send_file, jsonify
 from services import exportar_guardias_excel
-from services.consultas import obtener_personas_activas
+from services.consultas import obtener_personas_activas, formatear_nombre
 
 export_bp = Blueprint('export', __name__, url_prefix='/api')
 
@@ -26,6 +26,6 @@ def get_acumulados():
     personas = obtener_personas_activas()
     return jsonify([{
         'id': p.id,
-        'nombre': p.nombre,
+        'nombre': formatear_nombre(p.nombre),
         'acumulado': p.acumulado
     } for p in personas])

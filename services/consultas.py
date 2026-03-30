@@ -174,3 +174,36 @@ def obtener_todas_las_personas():
 def obtener_personas_activas():
     """Obtiene solo las personas activas"""
     return Persona.query.filter_by(activo=True).all()
+
+
+def formatear_nombre(nombre):
+    """Formatea el nombre en el formato abreviado en mayúscula"""
+    if not nombre:
+        return nombre
+
+    nombre = nombre.strip().upper()
+    # Normalizar espacios alrededor de puntos y eliminar múltiples espacios
+    nombre = nombre.replace('.', '. ').replace('  ', ' ').strip()
+    while '  ' in nombre:
+        nombre = nombre.replace('  ', ' ')
+
+    partes = nombre.split()
+
+    # Si el nombre ya viene con inicial y punto (ej: G. SAN MARTIN o M. HAVLICZEK)
+    if partes and partes[0].endswith('.'):
+        if len(partes) == 1:
+            return partes[0]
+        return partes[0] + ' ' + ' '.join(partes[1:])
+
+    if len(partes) <= 1:
+        return nombre
+    if len(partes) == 2:
+        return partes[0][0] + '. ' + partes[1]
+    if len(partes) == 3:
+        return partes[0][0] + '. ' + partes[1][0] + '. ' + partes[2]
+
+    # Para más de 3 partes, iniciales juntas de los primeros, inicial del penúltimo, apellido
+    iniciales_primeros = ''.join(p[0] for p in partes[:-2])
+    inicial_penultimo = partes[-2][0]
+    apellido = partes[-1]
+    return f"{iniciales_primeros}. {inicial_penultimo}. {apellido}"

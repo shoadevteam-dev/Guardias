@@ -3,6 +3,8 @@ Rutas API para Personas
 """
 from flask import Blueprint, request, jsonify
 from models.models import Persona, Guardia, Novedad, HistoricoAcumulado, db
+from services.consultas import formatear_nombre, contar_guardias_mes
+from services.guardias_service import calcular_retenes_por_mes
 
 personas_bp = Blueprint('personas', __name__, url_prefix='/api/personas')
 
@@ -11,12 +13,33 @@ personas_bp = Blueprint('personas', __name__, url_prefix='/api/personas')
 def get_personas():
     """Obtiene todas las personas"""
     personas = Persona.query.all()
-    return jsonify([{
-        'id': p.id,
-        'nombre': p.nombre,
-        'activo': p.activo,
-        'acumulado': p.acumulado
-    } for p in personas])
+
+    mes = request.args.get('mes', type=int)
+    anio = request.args.get('anio', type=int)
+
+    guardias_por_persona = {}
+    retenes_por_persona = {}
+
+    if mes and anio:
+        for p in personas:
+            guardias_por_persona[p.id] = contar_guardias_mes(p.id, mes, anio)
+        _, retenes_por_persona = calcular_retenes_por_mes(mes, anio)
+
+    resultado = []
+    for p in personas:
+        guardias = guardias_por_persona.get(p.id, 0)
+        retenes = retenes_por_persona.get(p.id, 0)
+
+        resultado.append({
+            'id': p.id,
+            'nombre': 'PAC ' + formatear_nombre(p.nombre),
+            'activo': p.activo,
+            'acumulado': p.acumulado,
+            'guardias': guardias,
+            'retenes': retenes
+        })
+
+    return jsonify(resultado)
 
 
 @personas_bp.route('', methods=['POST'])

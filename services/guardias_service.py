@@ -7,6 +7,7 @@ from models.models import Guardia, Persona, HistoricoAcumulado, Novedad, db
 from services.consultas import (
     obtener_personas_disponibles,
     contar_guardias_mes,
+    obtener_guardias_mes,
     tiene_guardia_anterior,
     tiene_guardia_dia_medio,
     tiene_sipat_guardia_anterior,
@@ -142,6 +143,91 @@ def generar_guardias_mes(mes, anio):
     return True
 
 
+def calcular_retenes_por_mes(mes, anio):
+    """Calcula el retén de cada fecha y retorna contador por persona"""
+    guardias = obtener_guardias_mes(mes, anio)
+    personas_activas = Persona.query.filter_by(activo=True).all()
+    reten_contador = {p.id: 0 for p in personas_activas}
+    reten_fechas_dict = {}
+    sipat_reten_fechas = set()  # fechas donde un SIPAT fue reten
+
+    sipat_guardia_fechas = {}
+    for g in guardias:
+        persona = Persona.query.get(g.persona_id)
+        if persona and persona.grado and 'SIPAT' in persona.grado.upper():
+            sipat_guardia_fechas.setdefault(g.persona_id, set()).add(g.fecha)
+
+    todas_sipat_guardia_fechas = set()
+    for fechas in sipat_guardia_fechas.values():
+        todas_sipat_guardia_fechas.update(fechas)
+
+    reten_por_fecha = {}
+
+    for g in guardias:
+        disponibles = obtener_personas_disponibles(g.fecha, exclude_id=g.persona_id)
+        reten_id = None
+
+        if disponibles:
+            dia_anterior = g.fecha - timedelta(days=1)
+            dia_siguiente = g.fecha + timedelta(days=1)
+
+            persona = Persona.query.get(g.persona_id)
+            es_guardia_sipat = persona and persona.grado and 'SIPAT' in persona.grado.upper()
+
+            hubo_sipat_reten_ayer = dia_anterior in sipat_reten_fechas
+            dia_hace_2 = g.fecha - timedelta(days=2)
+            hubo_sipat_reten_hace_2 = dia_hace_2 in sipat_reten_fechas
+
+            hay_sipat_guardia_hoy = g.fecha in todas_sipat_guardia_fechas
+            hay_sipat_guardia_ayer = dia_anterior in todas_sipat_guardia_fechas
+            hay_sipat_guardia_manana = dia_siguiente in todas_sipat_guardia_fechas
+
+            candidatos = []
+            for p in disponibles:
+                fue_reten_anterior = reten_fechas_dict.get((p.id, dia_anterior), False)
+                fue_reten_siguiente = reten_fechas_dict.get((p.id, dia_siguiente), False)
+
+                es_reten_sipat = p.grado and p.grado.upper().find('SIPAT') >= 0
+                if es_guardia_sipat and es_reten_sipat:
+                    continue
+                if hubo_sipat_reten_ayer and es_reten_sipat:
+                    continue
+                if hubo_sipat_reten_hace_2 and es_reten_sipat:
+                    continue
+                if es_reten_sipat and (hay_sipat_guardia_hoy or hay_sipat_guardia_ayer or hay_sipat_guardia_manana):
+                    continue
+                if p.id in sipat_guardia_fechas and dia_siguiente in sipat_guardia_fechas[p.id]:
+                    continue
+                if p.id in sipat_guardia_fechas and dia_anterior in sipat_guardia_fechas[p.id]:
+                    continue
+
+                if not fue_reten_anterior and not fue_reten_siguiente:
+                    candidatos.append(p)
+
+            if not candidatos:
+                candidatos = disponibles
+
+            # prioritizar SIPAT que aún no han alcanzado 2 retenes
+            sipat_ids = [p.id for p in disponibles if p.grado and 'SIPAT' in p.grado.upper()]
+            sipat_necesitan = [p for p in candidatos if p.id in sipat_ids and reten_contador.get(p.id, 0) < 2]
+            if sipat_necesitan:
+                candidatos = sipat_necesitan
+
+            candidatos.sort(key=lambda p: reten_contador.get(p.id, 0))
+            persona_reten = candidatos[0]
+            reten_id = persona_reten.id
+
+            es_reten_sipat = persona_reten.grado and 'SIPAT' in persona_reten.grado.upper()
+            reten_fechas_dict[(persona_reten.id, g.fecha)] = True
+            reten_contador[persona_reten.id] = reten_contador.get(persona_reten.id, 0) + 1
+            if es_reten_sipat:
+                sipat_reten_fechas.add(g.fecha)
+
+        reten_por_fecha[g.fecha] = reten_id
+
+    return reten_por_fecha, reten_contador
+
+
 def _imprimir_balanceo(personas, guardias_mes_dict, mes, anio):
     """Imprime estadísticas de balanceo de guardias"""
     print(f"\n=== Balanceo de Guardias {mes}/{anio} ===")
@@ -208,13 +294,21 @@ def calcular_acumulados(mes, anio):
     if not personas:
         return
 
-    total_guardias = sum(contar_guardias_mes(p.id, mes, anio) for p in personas)
-    promedio = total_guardias / len(personas)
+    # Incluir retén en el cálculo de carga total (guardias + retenes)
+    _, retenes_por_fecha = calcular_retenes_por_mes(mes, anio)
+
+    total_tareas = sum(
+        contar_guardias_mes(p.id, mes, anio) + retenes_por_fecha.get(p.id, 0)
+        for p in personas
+    )
+    promedio = total_tareas / len(personas)
 
     acumulados_temp = {}
     for p in personas:
         guardias = contar_guardias_mes(p.id, mes, anio)
-        diferencia = promedio - guardias
+        retenes = retenes_por_fecha.get(p.id, 0)
+        tareas_totales = guardias + retenes
+        diferencia = promedio - tareas_totales
 
         # Histórico de meses anteriores
         historicos = HistoricoAcumulado.query.filter(
@@ -244,13 +338,15 @@ def calcular_acumulados(mes, anio):
 
     # Imprimir resumen
     print(f"\n=== Acumulados {mes}/{anio} ===")
-    print(f"{'Persona':<25} {'Guardias':<10} {'Diferencia':<12} {'Acumulado':<10}")
-    print("-" * 60)
+    print(f"{'Persona':<25} {'Guardias':<10} {'Retenes':<10} {'Tareas':<10} {'Diferencia':<12} {'Acumulado':<10}")
+    print("-" * 80)
     for p in personas:
         guardias = contar_guardias_mes(p.id, mes, anio)
-        diferencia = promedio - guardias
-        print(f"{p.nombre:<25} {guardias:<10} {diferencia:<12.2f} {p.acumulado:<10}")
-    print("=" * 60)
+        retenes = calcular_retenes_por_mes(mes, anio)[1].get(p.id, 0)
+        tareas = guardias + retenes
+        diferencia = promedio - tareas
+        print(f"{p.nombre:<25} {guardias:<10} {retenes:<10} {tareas:<10} {diferencia:<12.2f} {p.acumulado:<10}")
+    print("=" * 80)
 
 
 def reasignar_guardia(fecha_str, persona_id_nuevo, motivo=''):
@@ -368,3 +464,44 @@ def eliminar_acumulados_mes(mes, anio):
     for p in personas:
         acumulado_mes = acumulados_mes.get(p.id, 0)
         p.acumulado = (p.acumulado or 0) - acumulado_mes
+
+    db.session.commit()
+
+
+def asignar_guardia_manual(fecha_str, persona_id):
+    """Asigna manualmente una guardia en una fecha específica"""
+    fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+
+    # Verificar si ya existe una guardia en esa fecha
+    guardia_existente = Guardia.query.filter_by(fecha=fecha).first()
+    if guardia_existente:
+        return False, "Ya existe una guardia asignada para esa fecha"
+
+    persona = Persona.query.get(persona_id)
+    if not persona:
+        return False, "Persona no encontrada"
+
+    if not persona.activo:
+        return False, "La persona no está activa"
+
+    # Verificar novedades
+    tiene_novedad = Novedad.query.filter(
+        Novedad.persona_id == persona.id,
+        Novedad.fecha_inicio <= fecha,
+        Novedad.fecha_fin >= fecha
+    ).first()
+    
+    if tiene_novedad:
+        return False, f"La persona {persona.nombre} tiene una novedad en esa fecha"
+
+    guardia = Guardia(
+        fecha=fecha,
+        persona_id=persona_id,
+        tipo='manual'
+    )
+    db.session.add(guardia)
+    db.session.commit()
+    
+    calcular_acumulados(fecha.month, fecha.year)
+    
+    return True, "Guardia asignada exitosamente"

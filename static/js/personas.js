@@ -7,7 +7,9 @@ const PersonasModule = (function() {
      * Carga la lista de personas en la tabla
      */
     async function cargar() {
-        const res = await fetch('/api/personas');
+        const mes = document.getElementById('selectMes').value;
+        const anio = document.getElementById('selectAnio').value;
+        const res = await fetch(`/api/personas?mes=${mes}&anio=${anio}`);
         const personas = await res.json();
 
         const tbody = document.getElementById('tablaPersonas');
@@ -23,6 +25,12 @@ const PersonasModule = (function() {
                     <span class="badge acumulado-badge ${p.acumulado > 0 ? 'bg-warning' : p.acumulado < 0 ? 'bg-info' : 'bg-secondary'}">
                         ${p.acumulado}
                     </span>
+                </td>
+                <td>
+                    <span class="badge bg-primary">${p.guardias ?? 0}</span>
+                </td>
+                <td>
+                    <span class="badge bg-dark">${p.retenes ?? 0}</span>
                 </td>
                 <td>
                     <button class="btn btn-sm ${p.activo ? 'btn-warning' : 'btn-success'}" 

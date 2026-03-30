@@ -1,20 +1,32 @@
 import urllib.request
 import json
 from datetime import timedelta
+from collections import Counter
 
 r = urllib.request.urlopen('http://127.0.0.1:5050/api/guardias/1/2026', timeout=30)
 data = json.loads(r.read())
 
 print('=== ANALIZANDO RETENES SIPAT ===')
-sipat_nombres = ['A.Fortunato', 'E.Campillay', 'I.Rivas']
+sipat_nombres = {'A.FORTUNATO', 'E.CAMPILLAY', 'I.RIVAS'}
 sipat_retenes = []
+retenes_por_persona = Counter()
+total_retenes = 0
 
 for g in data:
-    if g['reten_nombre'] in sipat_nombres:
-        sipat_retenes.append(g['fecha_display'])
-        print(f"{g['fecha_display']} - {g['reten_nombre']}")
+    reten_nombre = g.get('reten_nombre', '').strip().upper()
+    if reten_nombre and reten_nombre != 'SIN RETÉN':
+        total_retenes += 1
+        retenes_por_persona[reten_nombre] += 1
 
-print(f'\nTotal retenes SIPAT: {len(sipat_retenes)}')
+    if reten_nombre in sipat_nombres:
+        sipat_retenes.append(g['fecha_display'])
+        print(f"{g['fecha_display']} - {reten_nombre}")
+
+print(f'\nTotal retenes: {total_retenes}')
+print(f'Total retenes SIPAT: {len(sipat_retenes)}')
+print('Reten por persona:')
+for persona, count in retenes_por_persona.items():
+    print(f'  {persona}: {count}')
 
 # Verificar separación entre retenes
 print('\n=== VERIFICANDO SEPARACIÓN ===')

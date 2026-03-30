@@ -4,7 +4,7 @@ Rutas API para Novedades
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from models.models import Novedad, Persona, db
-from services.consultas import obtener_persona_por_id
+from services.consultas import obtener_persona_por_id, formatear_nombre
 
 novedades_bp = Blueprint('novedades', __name__, url_prefix='/api/novedades')
 
@@ -19,7 +19,7 @@ def get_novedades():
         resultado.append({
             'id': n.id,
             'persona_id': n.persona_id,
-            'persona_nombre': persona.nombre if persona else 'N/A',
+            'persona_nombre': formatear_nombre(persona.nombre) if persona else 'N/A',
             'fecha_inicio': n.fecha_inicio.strftime('%Y-%m-%d'),
             'fecha_fin': n.fecha_fin.strftime('%Y-%m-%d'),
             'tipo': n.tipo,
