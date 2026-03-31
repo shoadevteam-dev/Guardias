@@ -12,7 +12,9 @@ from services.consultas import (
     tiene_guardia_dia_medio,
     tiene_sipat_guardia_anterior,
     tuvo_sipat_guardia_en_rango,
-    obtener_rango_mes
+    obtener_rango_mes,
+    esta_en_descanso,
+    tuvo_guardia_viernes_o_sabado_semana_anterior
 )
 
 
@@ -72,6 +74,9 @@ def generar_guardias_mes(mes, anio):
         disponibles = obtener_personas_disponibles(fecha_actual.date())
 
         if disponibles:
+            # Filtrar personas que están en período de descanso
+            disponibles = [p for p in disponibles if not esta_en_descanso(p.id, fecha_actual.date())]
+            
             # Filtrar candidatos
             candidatos = []
             for p in disponibles:
@@ -84,8 +89,19 @@ def generar_guardias_mes(mes, anio):
 
             # Evitar repetir Navidad
             if fecha_actual.month == 12 and fecha_actual.day in (25, 31):
-                candidatos = [p for p in candidatos 
+                candidatos = [p for p in candidatos
                              if not (navidad_persona_id and p.id == navidad_persona_id)]
+            
+            # Regla de rotación semanal para Viernes y Sábado
+            # Si es Viernes o Sábado, evitar que la misma persona de la semana anterior repita
+            dia_semana = fecha_actual.date().weekday()
+            if dia_semana in [4, 5]:  # Viernes (4) o Sábado (5)
+                candidatos = [p for p in candidatos 
+                             if not tuvo_guardia_viernes_o_sabado_semana_anterior(p.id, fecha_actual.date())]
+                
+                # Si no hay candidatos después del filtro, usar todos los disponibles
+                if not candidatos:
+                    candidatos = [p for p in disponibles if not esta_en_descanso(p.id, fecha_actual.date())]
 
             # Calcular scores
             scores = []
@@ -151,6 +167,9 @@ def calcular_retenes_por_mes(mes, anio):
     reten_fechas_dict = {}
     sipat_reten_fechas = set()  # fechas donde un SIPAT fue reten
 
+    # Crear un diccionario {fecha: persona_id} para verificar guardias de cada día
+    guardia_por_fecha = {g.fecha: g.persona_id for g in guardias}
+
     sipat_guardia_fechas = {}
     for g in guardias:
         persona = Persona.query.get(g.persona_id)
@@ -174,13 +193,11 @@ def calcular_retenes_por_mes(mes, anio):
             persona = Persona.query.get(g.persona_id)
             es_guardia_sipat = persona and persona.grado and 'SIPAT' in persona.grado.upper()
 
-            hubo_sipat_reten_ayer = dia_anterior in sipat_reten_fechas
-            dia_hace_2 = g.fecha - timedelta(days=2)
-            hubo_sipat_reten_hace_2 = dia_hace_2 in sipat_reten_fechas
-
+            # Verificar si hay guardia SIPAT el mismo día
             hay_sipat_guardia_hoy = g.fecha in todas_sipat_guardia_fechas
-            hay_sipat_guardia_ayer = dia_anterior in todas_sipat_guardia_fechas
-            hay_sipat_guardia_manana = dia_siguiente in todas_sipat_guardia_fechas
+            
+            # Verificar quién tuvo guardia ayer (para no asignarle retén hoy)
+            persona_guardia_ayer = guardia_por_fecha.get(dia_anterior)
 
             candidatos = []
             for p in disponibles:
@@ -188,17 +205,27 @@ def calcular_retenes_por_mes(mes, anio):
                 fue_reten_siguiente = reten_fechas_dict.get((p.id, dia_siguiente), False)
 
                 es_reten_sipat = p.grado and p.grado.upper().find('SIPAT') >= 0
+
+                # Regla 1: Si la guardia es de un SIPAT, el retén no puede ser otro SIPAT el mismo día
                 if es_guardia_sipat and es_reten_sipat:
                     continue
-                if hubo_sipat_reten_ayer and es_reten_sipat:
+                
+                # Regla 2: Si un SIPAT tiene guardia hoy (Domingo u otro día), ningún SIPAT puede ser retén hoy
+                # Esto aplica solo para el mismo día de la guardia SIPAT
+                if es_reten_sipat and hay_sipat_guardia_hoy:
                     continue
-                if hubo_sipat_reten_hace_2 and es_reten_sipat:
-                    continue
-                if es_reten_sipat and (hay_sipat_guardia_hoy or hay_sipat_guardia_ayer or hay_sipat_guardia_manana):
-                    continue
+                
+                # Regla 3: Si este SIPAT específico tiene guardia mañana, no puede ser retén hoy
                 if p.id in sipat_guardia_fechas and dia_siguiente in sipat_guardia_fechas[p.id]:
                     continue
+                
+                # Regla 4: Si este SIPAT específico tuvo guardia ayer, no puede ser retén hoy
                 if p.id in sipat_guardia_fechas and dia_anterior in sipat_guardia_fechas[p.id]:
+                    continue
+                
+                # Regla 5: Si una persona tuvo guardia AYER, no puede tener retén HOY
+                # (porque está en descanso después de la guardia)
+                if persona_guardia_ayer and p.id == persona_guardia_ayer:
                     continue
 
                 if not fue_reten_anterior and not fue_reten_siguiente:
@@ -394,6 +421,9 @@ def reasignar_guardia_random(fecha_str):
 
     if not disponibles:
         return False, "No hay personas disponibles", None, None
+
+    # Filtrar personas que están en período de descanso
+    disponibles = [p for p in disponibles if not esta_en_descanso(p.id, fecha)]
 
     # Filtrar por restricciones SIPAT
     candidatos = []

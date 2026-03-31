@@ -14,7 +14,7 @@ const CalendarioModule = (function() {
         const hoy = new Date();
         document.getElementById('selectMes').value = hoy.getMonth() + 1;
         document.getElementById('selectAnio').value = hoy.getFullYear();
-        
+
         // Agregar listeners a los selectores
         document.getElementById('selectMes').addEventListener('change', function() {
             setTimeout(cargarCalendario, 100);
@@ -22,7 +22,7 @@ const CalendarioModule = (function() {
         document.getElementById('selectAnio').addEventListener('change', function() {
             setTimeout(cargarCalendario, 100);
         });
-        
+
         cargarCalendario();
     }
 
@@ -57,18 +57,23 @@ const CalendarioModule = (function() {
         try {
             const res = await fetch(`/api/guardias/${mes}/${anio}`);
             console.log(`Respuesta API status: ${res.status}`);
-            
+
             if (!res.ok) {
                 console.error('Error al cargar guardias:', res.status);
                 return;
             }
             const guardias = await res.json();
             console.log(`Guardias recibidas: ${guardias.length}`);
-            
+
             guardiasActuales = guardias.length;
-            
+
             // Actualizar indicador de estado y botones
             actualizarEstado(guardias.length);
+
+            // Recargar personas con los nuevos valores de mes/año
+            if (typeof PersonasModule !== 'undefined') {
+                PersonasModule.cargar(mes, anio);
+            }
 
             const guardiasDict = {};
             guardias.forEach(g => {

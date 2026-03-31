@@ -5,11 +5,25 @@
 const PersonasModule = (function() {
     /**
      * Carga la lista de personas en la tabla
+     * @param {number} mes - Mes opcional, si no se pasa usa el valor del select
+     * @param {number} anio - Año opcional, si no se pasa usa el valor del select
      */
-    async function cargar() {
-        const mes = document.getElementById('selectMes').value;
-        const anio = document.getElementById('selectAnio').value;
-        const res = await fetch(`/api/personas?mes=${mes}&anio=${anio}`);
+    async function cargar(mes = null, anio = null) {
+        const mesSelect = document.getElementById('selectMes');
+        const anioSelect = document.getElementById('selectAnio');
+        
+        // Usar parámetros o valores del select
+        const mesValue = mes || mesSelect.value;
+        const anioValue = anio || anioSelect.value;
+        
+        // Si no hay valores válidos, no cargar
+        if (!mesValue || !anioValue) {
+            console.log('Esperando valores válidos de mes y año...');
+            setTimeout(() => cargar(mes, anio), 100);
+            return;
+        }
+        
+        const res = await fetch(`/api/personas?mes=${mesValue}&anio=${anioValue}`);
         const personas = await res.json();
 
         const tbody = document.getElementById('tablaPersonas');

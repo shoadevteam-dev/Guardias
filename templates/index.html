@@ -333,7 +333,7 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             CalendarioModule.init();
-            PersonasModule.cargar();
+            // PersonasModule.cargar() se llama desde CalendarioModule.init() después de cargar el calendario
             NovedadesModule.cargar();
             AcumuladosModule.cargar();
         });

@@ -5,18 +5,18 @@ from models import db, Persona
 
 
 PERSONAS_DEFAULT = [
-    {'nombre': 'P.ramirez', 'grado': None},
-    {'nombre': 'A.Fortunato', 'grado': 'SIPAT'},      # SIPAT - no día por medio
-    {'nombre': 'E.Campillay', 'grado': 'SIPAT'},       # SIPAT - no día por medio
-    {'nombre': 'I.Rivas', 'grado': 'SIPAT'},           # SIPAT - no día por medio
-    {'nombre': 'V.Rojas', 'grado': None},
-    {'nombre': 'G.San Martin', 'grado': None},
-    {'nombre': 'L.Henriquez', 'grado': None},
-    {'nombre': 'M.Havliczek', 'grado': None},
-    {'nombre': 'L.Zamorano', 'grado': None},
-    {'nombre': 'M.Rojas', 'grado': None},
-    {'nombre': 'A.Terraza', 'grado': None},
-    {'nombre': 'A.Rios', 'grado': None}
+    {'nombre': 'P.Ramirez T.', 'grado': None},
+    {'nombre': 'A.Fortunato B.', 'grado': 'SIPAT'},      # SIPAT - no día por medio
+    {'nombre': 'E.Campillay G.', 'grado': 'SIPAT'},       # SIPAT - no día por medio
+    {'nombre': 'I.Rivas D.', 'grado': 'SIPAT'},           # SIPAT - no día por medio
+    {'nombre': 'V.Rojas M.', 'grado': None},
+    {'nombre': 'G.San Martin R.', 'grado': None},
+    {'nombre': 'L.Henriquez C.', 'grado': None},
+    {'nombre': 'M.Havliczek M.', 'grado': None},
+    {'nombre': 'L.Zamorano G.', 'grado': None},
+    {'nombre': 'M.Rojas S.', 'grado': None},
+    {'nombre': 'A.Terraza G.', 'grado': None},
+    {'nombre': 'A.Rios A.', 'grado': None}
 ]
 
 
